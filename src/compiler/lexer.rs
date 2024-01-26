@@ -9,6 +9,9 @@ use thiserror::Error;
 pub enum ScanError {
     #[error("invalid tokens")]
     InvalidToken(Vec<Token>),
+
+    #[error("Unterminated string literal starting on line {0}")]
+    UnterminatedStringLiteral(u32),
 }
 
 fn keywords() -> HashMap<&'static str, TokenType> {
@@ -187,7 +190,24 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                 }
                 None => token.type_ = TokenType::SLASH,
             },
-            // TODO: String Literals
+
+            // String Literal
+            '"' => {
+                token.type_ = TokenType::STRINGLIT;
+                let mut str_lit = String::new();
+                while let Some(next_char) = chars.next_if(|c| *c != '"') {
+                    // TODO: allow for escaped quotes
+                    token.lexeme.push(next_char);
+                    str_lit.push(next_char);
+                }
+                match chars.next() {
+                    Some(next_char) => {
+                        token.lexeme.push(next_char);
+                        token.literal = Some(Literal::StringLit(str_lit));
+                    }
+                    None => return Err(ScanError::UnterminatedStringLiteral(token.line_num)),
+                }
+            }
 
             // everything else
             _ => {
