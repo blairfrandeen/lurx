@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types, dead_code, unused_imports, unused_variables)]
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
@@ -8,6 +9,27 @@ use thiserror::Error;
 pub enum ScanError {
     #[error("invalid tokens")]
     InvalidToken(Vec<Token>),
+}
+
+fn keywords() -> HashMap<&'static str, TokenType> {
+    let mut keywords: HashMap<&'static str, TokenType> = HashMap::new();
+    keywords.insert("and", TokenType::AND);
+    keywords.insert("class", TokenType::CLASS);
+    keywords.insert("else", TokenType::ELSE);
+    keywords.insert("false", TokenType::FALSE);
+    keywords.insert("for", TokenType::FOR);
+    keywords.insert("fun", TokenType::FUN);
+    keywords.insert("if", TokenType::IF);
+    keywords.insert("nil", TokenType::NIL);
+    keywords.insert("or", TokenType::OR);
+    keywords.insert("print", TokenType::PRINT);
+    keywords.insert("return", TokenType::RETURN);
+    keywords.insert("super", TokenType::SUPER);
+    keywords.insert("this", TokenType::THIS);
+    keywords.insert("true", TokenType::TRUE);
+    keywords.insert("var", TokenType::VAR);
+    keywords.insert("while", TokenType::WHILE);
+    keywords
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -40,8 +62,24 @@ pub enum TokenType {
     IDENTIFIER,
     STRINGLIT,
     NUMLIT,
+
     // Keywords
-    // TODO
+    AND,
+    CLASS,
+    ELSE,
+    FALSE,
+    FUN,
+    FOR,
+    IF,
+    NIL,
+    OR,
+    PRINT,
+    RETURN,
+    SUPER,
+    THIS,
+    TRUE,
+    VAR,
+    WHILE,
 
     // InvalidToken for error handling
     INVALID,
@@ -94,7 +132,19 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             '+' => token.type_ = TokenType::PLUS,
             '-' => token.type_ = TokenType::MINUS,
             '*' => token.type_ = TokenType::STAR,
-            '/' => token.type_ = TokenType::SLASH,
+            '/' => match chars.next_if(|c| *c == '/') {
+                Some(_) => {
+                    println!("found comment");
+                    // single line comment
+                    while let Some(next_chr) = chars.next() {
+                        if next_chr == '\n' {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                None => token.type_ = TokenType::SLASH,
+            },
             '(' => token.type_ = TokenType::LEFT_PAREN,
             ')' => token.type_ = TokenType::RIGHT_PAREN,
             '{' => token.type_ = TokenType::LEFT_BRACE,
@@ -132,8 +182,32 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                 }
                 None => token.type_ = TokenType::LESS,
             },
-            _ => token.type_ = TokenType::INVALID,
-            // logic for creating tokens based on the current character goes here
+
+            //
+            _ => {
+                if current_char.is_digit(10) {
+                    // number literal
+                    todo!()
+                } else if current_char.is_ascii_alphabetic() {
+                    while let Some(next_char) = chars.next() {
+                        if next_char.is_ascii_alphabetic() | next_char.is_digit(10) {
+                            token.lexeme.push(next_char)
+                        } else {
+                            break;
+                        }
+                    }
+                    match keywords().get(&token.lexeme.as_str()) {
+                        Some(token_type) => {
+                            token.type_ = token_type.clone();
+                        }
+                        None => token.type_ = TokenType::IDENTIFIER,
+                    }
+
+                    // check for keyword or identifier
+                } else {
+                    token.type_ = TokenType::INVALID;
+                }
+            }
         };
         tokens.push(token);
     }
