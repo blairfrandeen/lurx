@@ -1,13 +1,12 @@
 mod compiler;
 
-use compiler::lexer::{Literal, Token, TokenType};
+use compiler::lexer;
 
 fn main() {
-    let tok = Token {
-        type_: TokenType::StringLit,
-        line_num: 0,
-        literal: Some(Literal::StringLit("world".to_string())),
-    };
+    let source = "+\n+".to_string();
+    let toks = lexer::scan_source(&source).unwrap();
 
-    println!("Hello, {tok}");
+    for token in toks.iter() {
+        println!("{token:?}");
+    }
 }
