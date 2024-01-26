@@ -88,7 +88,7 @@ pub enum TokenType {
 #[derive(Debug, Clone)]
 pub enum Literal {
     StringLit(String),
-    NumLit(i32),
+    NumLit(f32),
 }
 
 #[derive(Debug, Clone)]
@@ -123,28 +123,20 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             ..Default::default()
         };
         match current_char {
+            // newlines don't count as tokens, so we just increment the line number.
             '\n' => {
-                // newlines don't count as tokens, so we just increment the line number.
                 line_num += 1;
                 continue;
             }
+
+            // ignore whitespace
+            ' ' => continue,
+            '\t' => continue,
+
             // Single character tokens
             '+' => token.type_ = TokenType::PLUS,
             '-' => token.type_ = TokenType::MINUS,
             '*' => token.type_ = TokenType::STAR,
-            '/' => match chars.next_if(|c| *c == '/') {
-                Some(_) => {
-                    println!("found comment");
-                    // single line comment
-                    while let Some(next_chr) = chars.next() {
-                        if next_chr == '\n' {
-                            break;
-                        }
-                    }
-                    continue;
-                }
-                None => token.type_ = TokenType::SLASH,
-            },
             '(' => token.type_ = TokenType::LEFT_PAREN,
             ')' => token.type_ = TokenType::RIGHT_PAREN,
             '{' => token.type_ = TokenType::LEFT_BRACE,
@@ -183,27 +175,45 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                 None => token.type_ = TokenType::LESS,
             },
 
-            //
-            _ => {
-                if current_char.is_digit(10) {
-                    // number literal
-                    todo!()
-                } else if current_char.is_ascii_alphabetic() {
-                    while let Some(next_char) = chars.next() {
-                        if next_char.is_ascii_alphabetic() | next_char.is_digit(10) {
-                            token.lexeme.push(next_char)
-                        } else {
+            // slash or single line comment
+            '/' => match chars.next_if(|c| *c == '/') {
+                Some(_) => {
+                    while let Some(next_chr) = chars.next() {
+                        if next_chr == '\n' {
                             break;
                         }
                     }
-                    match keywords().get(&token.lexeme.as_str()) {
-                        Some(token_type) => {
-                            token.type_ = token_type.clone();
-                        }
-                        None => token.type_ = TokenType::IDENTIFIER,
+                    continue;
+                }
+                None => token.type_ = TokenType::SLASH,
+            },
+            // TODO: String Literals
+
+            // everything else
+            _ => {
+                if current_char.is_digit(10) {
+                    // number literal
+                    while let Some(next_char) =
+                        chars.next_if(|c| (*c == '.') | (*c == '_') | c.is_digit(10))
+                    {
+                        token.lexeme.push(next_char);
+                    }
+                    let num_value: f32 = token.lexeme.parse().expect("Error parsing float!");
+                    token.literal = Some(Literal::NumLit(num_value));
+                    token.type_ = TokenType::NUMLIT;
+                } else if current_char.is_ascii_alphabetic() {
+                    // all keywords start and identifiers start with a letter
+                    while let Some(next_char) =
+                        chars.next_if(|c| c.is_ascii_alphabetic() | c.is_digit(10))
+                    {
+                        token.lexeme.push(next_char);
                     }
 
-                    // check for keyword or identifier
+                    // check for keyword
+                    match keywords().get(&token.lexeme.as_str()) {
+                        Some(token_type) => token.type_ = token_type.clone(),
+                        None => token.type_ = TokenType::IDENTIFIER,
+                    }
                 } else {
                     token.type_ = TokenType::INVALID;
                 }
@@ -226,9 +236,12 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
 
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match &self.literal {
-            Some(lit) => write!(f, "{:?} ({})", self.type_, lit)?,
-            None => write!(f, "{:?}", self.type_)?,
+        match &self.type_ {
+            TokenType::IDENTIFIER => write!(f, "{:?} ({})", self.type_, self.lexeme)?,
+            _ => match &self.literal {
+                Some(lit) => write!(f, "{:?} ({})", self.type_, lit)?,
+                None => write!(f, "{:?}", self.type_)?,
+            },
         }
         Ok(())
     }
