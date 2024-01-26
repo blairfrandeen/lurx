@@ -193,10 +193,14 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             _ => {
                 if current_char.is_digit(10) {
                     // number literal
+                    let mut found_decimal = false;
                     while let Some(next_char) =
-                        chars.next_if(|c| (*c == '.') | (*c == '_') | c.is_digit(10))
+                        chars.next_if(|c| ((*c == '.') & !found_decimal) | c.is_digit(10))
                     {
                         token.lexeme.push(next_char);
+                        if next_char == '.' {
+                            found_decimal = true;
+                        }
                     }
                     let num_value: f32 = token.lexeme.parse().expect("Error parsing float!");
                     token.literal = Some(Literal::NumLit(num_value));
