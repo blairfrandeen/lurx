@@ -3,13 +3,16 @@ mod compiler;
 use compiler::lexer;
 
 fn main() {
+    let source = "andy formless fo _ _123 _abc ab123\n
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
+        .to_string();
     let source =
-        "+\n+\n!=!>=<====wtf \" and \" or while///-/+banana\nhi+\n4000.56.77..45..".to_string();
+        "and class else false for fun if nil or return super this true var while".to_string();
     let toks = lexer::scan_source(&source);
     match toks {
         Ok(tokens) => {
             for token in tokens.iter() {
-                println!("{token}");
+                println!("{token:?}");
             }
         }
         Err(invalid_tokens) => {

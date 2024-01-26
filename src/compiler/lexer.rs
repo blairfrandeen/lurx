@@ -86,6 +86,9 @@ pub enum TokenType {
 
     // InvalidToken for error handling
     INVALID,
+
+    // End of file
+    EOF,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +119,8 @@ impl Default for Token {
 pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
     let mut chars = source.chars().peekable();
     let mut tokens: Vec<Token> = Vec::new();
+
+    let keywords: HashMap<&str, TokenType> = keywords();
     // let mut invalid_tokens: Vec<Token> = Vec::new();
     let mut line_num: u32 = 1;
     while let Some(current_char) = chars.next() {
@@ -211,8 +216,8 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
 
             // everything else
             _ => {
+                // number literal
                 if current_char.is_digit(10) {
-                    // number literal
                     let mut found_decimal = false;
                     while let Some(next_char) =
                         chars.next_if(|c| ((*c == '.') & !found_decimal) | c.is_digit(10))
@@ -225,16 +230,17 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                     let num_value: f32 = token.lexeme.parse().expect("Error parsing float!");
                     token.literal = Some(Literal::NumLit(num_value));
                     token.type_ = TokenType::NUMLIT;
-                } else if current_char.is_ascii_alphabetic() {
-                    // all keywords start and identifiers start with a letter
+
+                // all keywords start and identifiers start with a letter
+                } else if current_char.is_ascii_alphabetic() | (current_char == '_') {
                     while let Some(next_char) =
-                        chars.next_if(|c| c.is_ascii_alphabetic() | c.is_digit(10))
+                        chars.next_if(|c| c.is_ascii_alphabetic() | c.is_digit(10) | (*c == '_'))
                     {
                         token.lexeme.push(next_char);
                     }
 
                     // check for keyword
-                    match keywords().get(&token.lexeme.as_str()) {
+                    match keywords.get(&token.lexeme.as_str()) {
                         Some(token_type) => token.type_ = token_type.clone(),
                         None => token.type_ = TokenType::IDENTIFIER,
                     }
@@ -245,6 +251,11 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
         };
         tokens.push(token);
     }
+    tokens.push(Token {
+        type_: TokenType::EOF,
+        line_num,
+        ..Default::default()
+    });
     let invalid_tokens: Vec<Token> = tokens
         .clone()
         .into_iter()
