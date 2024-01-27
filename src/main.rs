@@ -7,7 +7,7 @@ fn main() {
 abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
         .to_string();
     let source =
-        "and class else false for fun if nil or return super this true var while".to_string();
+        "and class else false fortress fun if nil or return super this true var while".to_string();
     let toks = lexer::scan_source(&source);
     match toks {
         Ok(tokens) => {

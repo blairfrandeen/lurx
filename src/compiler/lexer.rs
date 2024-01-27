@@ -1,7 +1,6 @@
-#![allow(non_camel_case_types, dead_code, unused_imports, unused_variables)]
+#![allow(non_camel_case_types)]
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::io::Write;
 
 use thiserror::Error;
 
@@ -59,7 +58,6 @@ pub enum TokenType {
     GREATER_EQUAL,
     LESS,
     LESS_EQUAL,
-    // TODO
 
     // Literals
     IDENTIFIER,
@@ -121,8 +119,8 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
     let mut tokens: Vec<Token> = Vec::new();
 
     let keywords: HashMap<&str, TokenType> = keywords();
-    // let mut invalid_tokens: Vec<Token> = Vec::new();
     let mut line_num: u32 = 1;
+
     while let Some(current_char) = chars.next() {
         let lexeme = String::from(current_char);
         let mut token = Token {
@@ -140,6 +138,7 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             // ignore whitespace
             ' ' => continue,
             '\t' => continue,
+            '\r' => continue,
 
             // Single character tokens
             '+' => token.type_ = TokenType::PLUS,
@@ -202,6 +201,9 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                 let mut str_lit = String::new();
                 while let Some(next_char) = chars.next_if(|c| *c != '"') {
                     // TODO: allow for escaped quotes
+                    if next_char == '\n' {
+                        line_num += 1;
+                    }
                     token.lexeme.push(next_char);
                     str_lit.push(next_char);
                 }
