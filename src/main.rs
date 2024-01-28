@@ -1,13 +1,11 @@
-mod compiler;
+pub mod compiler;
 
 use compiler::lexer;
 
+use std::fs;
+
 fn main() {
-    let source = "andy formless fo _ _123 _abc ab123\n
-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
-        .to_string();
-    let source =
-        "and class else false fortress fun if nil or return super this true var while".to_string();
+    let source = fs::read_to_string("tests/lox.lox").unwrap();
     let toks = lexer::scan_source(&source);
     match toks {
         Ok(tokens) => {

@@ -89,7 +89,7 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     StringLit(String),
     NumLit(f32),
@@ -291,5 +291,88 @@ impl Display for Literal {
             Literal::NumLit(n) => write!(f, "{n}")?,
         }
         Ok(())
+    }
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        (self.type_ == other.type_)
+            & (self.lexeme == other.lexeme)
+            & (self.literal == other.literal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_identifiers() {
+        let input = "
+   andy formless fo _ _123 _abc ab123
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
+            .to_string();
+        let result = scan_source(&input).expect("should work");
+        let mut results = result.iter();
+
+        let lexemes = vec![
+            "andy",
+            "formless",
+            "fo",
+            "_",
+            "_123",
+            "_abc",
+            "ab123",
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_",
+        ];
+        let mut lex_iter = lexemes.iter();
+
+        while let Some(lex) = lex_iter.next() {
+            let test_tok = Token {
+                type_: TokenType::IDENTIFIER,
+                lexeme: lex.to_string(),
+                ..Default::default()
+            };
+            let res = results.next().expect("should have enough tokens");
+            assert_eq!(&test_tok, res,)
+        }
+        assert_eq!(
+            results.next().expect("Should have EOF").type_,
+            TokenType::EOF
+        )
+    }
+
+    #[test]
+    fn test_keywords() {
+        let input =
+            String::from("and class else false for fun if nil or return super this true var while");
+        let result = scan_source(&input).expect("should work");
+        let types = vec![
+            TokenType::AND,
+            TokenType::CLASS,
+            TokenType::ELSE,
+            TokenType::FALSE,
+            TokenType::FOR,
+            TokenType::FUN,
+            TokenType::IF,
+            TokenType::NIL,
+            TokenType::OR,
+            TokenType::RETURN,
+            TokenType::SUPER,
+            TokenType::THIS,
+            TokenType::TRUE,
+            TokenType::VAR,
+            TokenType::WHILE,
+            TokenType::EOF,
+        ];
+        for i in 0..types.len() {
+            assert_eq!(types[i], result[i].type_);
+        }
+    }
+
+    #[test]
+    fn test_loxlox() {
+        let loxlox = std::fs::read_to_string("tests/lox.lox").expect("file should exist");
+        assert!(scan_source(&loxlox).is_ok())
     }
 }
