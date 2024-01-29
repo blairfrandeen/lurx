@@ -10,7 +10,7 @@ pub enum ScanError {
     InvalidToken(Vec<Token>),
 
     #[error("Unterminated string literal starting on line {0}")]
-    UnterminatedStringLiteral(u32),
+    UnterminatedStringLiteral(usize),
 }
 
 fn keywords() -> HashMap<&'static str, TokenType> {
@@ -98,7 +98,7 @@ pub enum Literal {
 #[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
-    pub line_num: u32,
+    pub line_num: usize,
     pub literal: Option<Literal>,
     pub lexeme: String,
 }
@@ -119,7 +119,7 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
     let mut tokens: Vec<Token> = Vec::new();
 
     let keywords: HashMap<&str, TokenType> = keywords();
-    let mut line_num: u32 = 1;
+    let mut line_num: usize = 1;
 
     while let Some(current_char) = chars.next() {
         let lexeme = String::from(current_char);

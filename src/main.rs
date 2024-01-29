@@ -37,8 +37,54 @@ fn main() {
                 println!("{token:?}");
             }
         }
-        Err(invalid_tokens) => {
-            println!("{invalid_tokens:?}");
+        Err(scan_err) => {
+            handle_scan_error(scan_err, &source);
         }
+    }
+}
+
+fn handle_scan_error(scan_error: lexer::ScanError, source: &String) {
+    match scan_error {
+        lexer::ScanError::InvalidToken(tokens) => handle_invalid_tokens(tokens, &source),
+        lexer::ScanError::UnterminatedStringLiteral(line_num) => {
+            handle_unterminated_literal(line_num, &source)
+        }
+    }
+}
+
+fn handle_unterminated_literal(line_num: usize, source: &String) {
+    let current_line = &source
+        .lines()
+        .nth(line_num - 1)
+        .expect("source should have correct number of lines");
+    let char_index = &current_line
+        .rfind('"')
+        .expect("character should be in line");
+    println!(
+        "Syntax Error line {}: Unterminated string literal",
+        line_num
+    );
+    ?
+    println!("\t{current_line}");
+    println!("\t{: >1$}", "^", char_index + 1);
+    println!();
+}
+
+fn handle_invalid_tokens(invalid_tokens: Vec<lexer::Token>, source: &String) {
+    for token in invalid_tokens.iter() {
+        let current_line = &source
+            .lines()
+            .nth(token.line_num - 1)
+            .expect("source should have correct number of lines");
+        let char_index = &current_line
+            .find(&token.lexeme)
+            .expect("character should be in line");
+        println!(
+            "Syntax Error line {}: Invalid token ('{}')",
+            token.line_num, token.lexeme
+        );
+        println!("\t{current_line}");
+        println!("\t{: >1$}", "^", char_index + 1);
+        println!();
     }
 }
