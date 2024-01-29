@@ -64,7 +64,6 @@ fn handle_unterminated_literal(line_num: usize, source: &String) {
         "Syntax Error line {}: Unterminated string literal",
         line_num
     );
-    ?
     println!("\t{current_line}");
     println!("\t{: >1$}", "^", char_index + 1);
     println!();
