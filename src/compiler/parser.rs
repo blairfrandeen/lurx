@@ -3,7 +3,7 @@ use crate::lexer::{Token, TokenType};
 
 use std::iter::{Iterator, Peekable};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {}
 
 pub trait Parse {
@@ -20,31 +20,31 @@ pub fn parse_tokens(tokens: Vec<Token>) {
     dbg!(res);
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Expression {
     Equality(Equality),
     // TODO!
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Equality {
     comparison: Comparison,
     components: Vec<EqualityComponent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum EqualityComponent {
     Equals(Comparison),
     NotEquals(Comparison),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Comparison {
     term: Term,
     components: Vec<ComparisonComponent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum ComparisonComponent {
     Greater(Term),
     GreaterEquals(Term),
@@ -52,38 +52,38 @@ enum ComparisonComponent {
     LessEquals(Term),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Term {
     factor: Factor,
     components: Vec<TermComponent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TermComponent {
     Add(Factor),
     Sub(Factor),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Factor {
     unary: Unary,
     components: Vec<FactorComponent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum FactorComponent {
     Mul(Unary),
     Div(Unary),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Unary {
     Minus(Box<Unary>),
     Not(Box<Unary>),
     Primary(Primary),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Primary {
     Number(f32),
     StrLit(String),
@@ -130,5 +130,33 @@ impl Parse for Primary {
         } else {
             panic!("unexpected EOF!");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_primary() {
+        let primary_source = String::from("true false nil 55 \"hello\"");
+        let primary_tokens = crate::lexer::scan_source(&primary_source).unwrap();
+        let mut token_iter = primary_tokens.iter().peekable();
+        assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::True));
+        assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::False));
+        assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::Nil));
+        let next = Primary::parse(&mut token_iter);
+        match next {
+            Ok(Primary::Number(n)) => assert_eq!(n, 55.0),
+            _ => panic!(),
+        }
+        let next = Primary::parse(&mut token_iter);
+        match next {
+            Ok(Primary::StrLit(n)) => assert_eq!(n, "hello".to_string()),
+            _ => panic!(),
+        }
+        assert_eq!(
+            token_iter.next().unwrap().type_,
+            crate::lexer::TokenType::EOF
+        );
     }
 }
