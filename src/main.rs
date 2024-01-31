@@ -1,7 +1,7 @@
 pub mod compiler;
 
 use clap::{CommandFactory, Parser};
-use compiler::lexer;
+use compiler::{lexer, parser};
 
 use std::fs;
 use std::path::PathBuf;
@@ -32,22 +32,23 @@ fn main() {
     }
     let toks = lexer::scan_source(&source);
     match toks {
-        Ok(tokens) => {
+        Ok(ref tokens) => {
             for token in tokens.iter() {
                 println!("{token:?}");
             }
         }
-        Err(scan_err) => {
+        Err(ref scan_err) => {
             handle_scan_error(scan_err, &source);
         }
     }
+    parser::parse_tokens(toks.unwrap());
 }
 
-fn handle_scan_error(scan_error: lexer::ScanError, source: &String) {
+fn handle_scan_error(scan_error: &lexer::ScanError, source: &String) {
     match scan_error {
-        lexer::ScanError::InvalidToken(tokens) => handle_invalid_tokens(tokens, &source),
+        lexer::ScanError::InvalidToken(ref tokens) => handle_invalid_tokens(&tokens, &source),
         lexer::ScanError::UnterminatedStringLiteral(line_num) => {
-            handle_unterminated_literal(line_num, &source)
+            handle_unterminated_literal(*line_num, &source)
         }
     }
 }
@@ -69,7 +70,7 @@ fn handle_unterminated_literal(line_num: usize, source: &String) {
     println!();
 }
 
-fn handle_invalid_tokens(invalid_tokens: Vec<lexer::Token>, source: &String) {
+fn handle_invalid_tokens(invalid_tokens: &Vec<lexer::Token>, source: &String) {
     for token in invalid_tokens.iter() {
         let current_line = &source
             .lines()
