@@ -16,36 +16,65 @@ pub trait Parse {
         todo!();
     }
 }
-struct Operator {
-    kind: TokenType,
-}
 
 enum Expression {
-    Literal(Literal),
-    Unary(Unary),
-    Binary(Binary),
-    Grouping(Grouping),
+    Equality(Equality),
+    // TODO!
 }
 
-enum Literal {
+struct Equality {
+    comparison: Comparison,
+    components: Vec<EqualityComponent>,
+}
+
+enum EqualityComponent {
+    Equals(Comparison),
+    NotEquals(Comparison),
+}
+
+struct Factor {
+    unary: Unary,
+    components: Vec<FactorComponent>,
+}
+
+enum FactorComponent {
+    Mul(Unary),
+    Div(Unary),
+}
+
+enum Unary {
+    Minus(Box<Unary>),
+    Not(Box<Unary>),
+    Primary(Primary),
+}
+
+enum Primary {
     Number(f32),
     StrLit(String),
     True,
     False,
     Nil,
+    Group(Box<Expression>),
 }
 
-enum Unary {
-    Minus(Box<Expression>),
-    Not(Box<Expression>),
+struct Comparison {
+    term: Term,
+    components: Vec<ComparisonComponent>,
 }
 
-struct Grouping {
-    expr: Box<Expression>,
+enum ComparisonComponent {
+    Greater(Term),
+    GreaterEquals(Term),
+    Less(Term),
+    LessEquals(Term),
 }
 
-struct Binary {
-    left: Box<Expression>,
-    op: Operator,
-    right: Box<Expression>,
+struct Term {
+    factor: Factor,
+    components: Vec<TermComponent>,
+}
+
+enum TermComponent {
+    Add(Factor),
+    Sub(Factor),
 }
