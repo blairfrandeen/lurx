@@ -1,8 +1,23 @@
 #![allow(unused)]
-use crate::compiler::lexer;
+use crate::lexer::{Token, TokenType};
 
+use std::iter::{Iterator, Peekable};
+
+pub enum ParseError {}
+
+pub trait Parse {
+    fn build<'a>(
+        &self,
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError>
+    where
+        Self: Sized,
+    {
+        todo!();
+    }
+}
 struct Operator {
-    kind: lexer::TokenType,
+    kind: TokenType,
 }
 
 enum Expression {
