@@ -16,7 +16,7 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Unary::parse(&mut token_iter);
+    let res = Factor::parse(&mut token_iter);
     dbg!(res);
 }
 
@@ -74,6 +74,25 @@ struct Factor {
 enum FactorComponent {
     Mul(Unary),
     Div(Unary),
+}
+
+impl Parse for Factor {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        let unary = Unary::parse(tokens)?;
+        let mut components: Vec<FactorComponent> = Vec::new();
+        while let Some(next_token) =
+            tokens.next_if(|tok| (tok.type_ == TokenType::STAR) | (tok.type_ == TokenType::SLASH))
+        {
+            match next_token.type_ {
+                TokenType::STAR => components.push(FactorComponent::Mul(Unary::parse(tokens)?)),
+                TokenType::SLASH => components.push(FactorComponent::Div(Unary::parse(tokens)?)),
+                _ => panic!("unexpected token!"),
+            }
+        }
+        Ok(Factor { unary, components })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -161,6 +180,7 @@ impl Parse for Primary {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_primary() {
         let primary_source = String::from("true false nil 55 \"hello\"");
@@ -238,5 +258,24 @@ mod tests {
             Unary::parse(&mut token_iter),
             Ok(Unary::Minus(Box::new(Unary::Primary(Primary::Number(5.0)))))
         );
+    }
+
+    #[test]
+    fn test_factor() {
+        let factor_source = String::from("5*8/-2");
+        let factor_tokens = crate::lexer::scan_source(&factor_source).unwrap();
+        let mut token_iter = factor_tokens.iter().peekable();
+        assert_eq!(
+            Factor::parse(&mut token_iter),
+            Ok(Factor {
+                unary: Unary::Primary(Primary::Number(5.0)),
+                components: vec![
+                    FactorComponent::Mul(Unary::Primary(Primary::Number(8.0))),
+                    FactorComponent::Div(Unary::Minus(Box::new(Unary::Primary(Primary::Number(
+                        2.0
+                    )))))
+                ]
+            })
+        )
     }
 }
