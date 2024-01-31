@@ -16,7 +16,7 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Primary::parse(&mut token_iter);
+    let res = Unary::parse(&mut token_iter);
     dbg!(res);
 }
 
@@ -83,6 +83,29 @@ enum Unary {
     Primary(Primary),
 }
 
+impl Parse for Unary {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        if let Some(next_token) = tokens.peek() {
+            let unary = match next_token.type_ {
+                TokenType::MINUS => {
+                    tokens.next();
+                    Unary::Minus(Box::new(Unary::parse(tokens)?))
+                }
+                TokenType::BANG => {
+                    tokens.next();
+                    Unary::Not(Box::new(Unary::parse(tokens)?))
+                }
+                _ => Unary::Primary(Primary::parse(tokens)?),
+            };
+            Ok(unary)
+        } else {
+            panic!("unexpected EOF!");
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum Primary {
     Number(f32),
@@ -97,8 +120,8 @@ impl Parse for Primary {
     fn parse<'a>(
         tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
     ) -> Result<Self, ParseError> {
-        if let Some(next_token) = tokens.next() {
-            match next_token.type_ {
+        if let Some(next_token) = tokens.peek() {
+            let primary = match next_token.type_ {
                 TokenType::NUMLIT => {
                     let value = match next_token
                         .literal
@@ -126,7 +149,9 @@ impl Parse for Primary {
                 TokenType::NIL => Ok(Primary::Nil),
                 TokenType::LEFT_PAREN => todo!(),
                 _ => todo!(),
-            }
+            };
+            tokens.next();
+            primary
         } else {
             panic!("unexpected EOF!");
         }
@@ -157,6 +182,61 @@ mod tests {
         assert_eq!(
             token_iter.next().unwrap().type_,
             crate::lexer::TokenType::EOF
+        );
+    }
+
+    #[test]
+    fn test_unary_primary() {
+        let unary_source = String::from("true false nil 55 \"hello\"");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.iter().peekable();
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Primary(Primary::True))
+        );
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Primary(Primary::False))
+        );
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Primary(Primary::Nil))
+        );
+        match Unary::parse(&mut token_iter) {
+            Ok(Unary::Primary(Primary::Number(n))) => assert_eq!(n, 55.0),
+            _ => panic!(),
+        }
+        match Unary::parse(&mut token_iter) {
+            Ok(Unary::Primary(Primary::StrLit(n))) => assert_eq!(n, "hello".to_string()),
+            _ => panic!(),
+        }
+        assert_eq!(
+            token_iter.next().unwrap().type_,
+            crate::lexer::TokenType::EOF
+        );
+    }
+
+    #[test]
+    fn test_unary_not() {
+        let unary_source = String::from("!!true");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.iter().peekable();
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Not(Box::new(Unary::Not(Box::new(Unary::Primary(
+                Primary::True
+            ))))))
+        );
+    }
+
+    #[test]
+    fn test_unary_minus() {
+        let unary_source = String::from("-5");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.iter().peekable();
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Minus(Box::new(Unary::Primary(Primary::Number(5.0)))))
         );
     }
 }
