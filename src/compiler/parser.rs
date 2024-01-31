@@ -131,7 +131,7 @@ impl Parse for Primary {
                         crate::compiler::lexer::Literal::NumLit(num) => num,
                         _ => panic!("NUMLIT token with incorrect literal type!"),
                     };
-                    Ok(Primary::Number(*value))
+                    Primary::Number(*value)
                 }
                 TokenType::STRINGLIT => {
                     let value = match next_token
@@ -142,16 +142,16 @@ impl Parse for Primary {
                         crate::compiler::lexer::Literal::StringLit(strlit) => strlit,
                         _ => panic!("STRINGLIT token with incorrect literal type!"),
                     };
-                    Ok(Primary::StrLit(value.clone()))
+                    Primary::StrLit(value.clone())
                 }
-                TokenType::FALSE => Ok(Primary::False),
-                TokenType::TRUE => Ok(Primary::True),
-                TokenType::NIL => Ok(Primary::Nil),
+                TokenType::FALSE => Primary::False,
+                TokenType::TRUE => Primary::True,
+                TokenType::NIL => Primary::Nil,
                 TokenType::LEFT_PAREN => todo!(),
                 _ => todo!(),
             };
             tokens.next();
-            primary
+            Ok(primary)
         } else {
             panic!("unexpected EOF!");
         }
