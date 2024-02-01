@@ -17,9 +17,20 @@ pub trait Parse {
         Self: Sized;
 }
 
-pub fn parse_tokens(tokens: Vec<Token>) -> Result<Expression, ParseError> {
+pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expression>, ParseError> {
     let mut token_iter = tokens.iter().peekable();
-    Expression::parse(&mut token_iter)
+    let mut exprs: Vec<Expression> = Vec::new();
+    while let Some(next_tok) = token_iter.peek() {
+        match next_tok.type_ {
+            TokenType::EOF => break,
+            _ => {
+                let ex = Expression::parse(&mut token_iter)?;
+                exprs.push(ex);
+            }
+        }
+    }
+    dbg!(token_iter.peek());
+    Ok(exprs)
 }
 
 #[derive(Debug, PartialEq)]
@@ -272,6 +283,18 @@ impl Parse for Primary {
                         panic!("Unexpected EOF!")
                     }
                 }
+                TokenType::RIGHT_PAREN => {
+                    if let Some(closing_paren) = tokens.next() {
+                        match closing_paren.type_ {
+                            TokenType::RIGHT_PAREN => {
+                                return Err(ParseError::UnclosedParenthesis(closing_paren.clone()))
+                            }
+                            _ => panic!("closing parenthesis unmatched and disappeared!"),
+                        }
+                    } else {
+                        panic!("Unexpected EOF!")
+                    }
+                }
                 _ => return Err(ParseError::UnexpectedToken(next_token.clone().clone())),
             };
             tokens.next();
@@ -503,5 +526,34 @@ mod tests {
                 })]
             }))
         );
+    }
+
+    #[test]
+    fn test_unmatched_lparen() {
+        let expr_source = String::from("((1+((2))/3)");
+        let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
+        let mut token_iter = expr_tokens.iter().peekable();
+        assert_eq!(
+            parse_tokens(expr_tokens),
+            Err(ParseError::UnclosedParenthesis(Token {
+                type_: TokenType::LEFT_PAREN,
+                lexeme: "(".to_string(),
+                ..Default::default()
+            }))
+        )
+    }
+    #[test]
+    fn test_unmatched_rparen() {
+        let expr_source = String::from("((1+2))/3)))");
+        let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
+        let mut token_iter = expr_tokens.iter().peekable();
+        assert_eq!(
+            parse_tokens(expr_tokens),
+            Err(ParseError::UnclosedParenthesis(Token {
+                type_: TokenType::RIGHT_PAREN,
+                lexeme: ")".to_string(),
+                ..Default::default()
+            }))
+        )
     }
 }
