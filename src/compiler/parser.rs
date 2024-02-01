@@ -16,7 +16,7 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Term::parse(&mut token_iter);
+    let res = Comparison::parse(&mut token_iter);
     dbg!(res);
 }
 
@@ -50,6 +50,36 @@ enum ComparisonComponent {
     GreaterEquals(Term),
     Less(Term),
     LessEquals(Term),
+}
+
+impl Parse for Comparison {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        let term = Term::parse(tokens)?;
+        let mut components: Vec<ComparisonComponent> = Vec::new();
+        while let Some(next_token) = tokens.next_if(|tok| {
+            (tok.type_ == TokenType::GREATER)
+                | (tok.type_ == TokenType::GREATER_EQUAL)
+                | (tok.type_ == TokenType::LESS)
+                | (tok.type_ == TokenType::LESS_EQUAL)
+        }) {
+            match next_token.type_ {
+                TokenType::GREATER => {
+                    components.push(ComparisonComponent::Greater(Term::parse(tokens)?))
+                }
+                TokenType::GREATER_EQUAL => {
+                    components.push(ComparisonComponent::GreaterEquals(Term::parse(tokens)?))
+                }
+                TokenType::LESS => components.push(ComparisonComponent::Less(Term::parse(tokens)?)),
+                TokenType::LESS_EQUAL => {
+                    components.push(ComparisonComponent::LessEquals(Term::parse(tokens)?))
+                }
+                _ => panic!("unexpected token!"),
+            }
+        }
+        Ok(Comparison { term, components })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -325,6 +355,32 @@ mod tests {
                         components: vec![]
                     })
                 ]
+            })
+        )
+    }
+
+    #[test]
+    fn test_comparison() {
+        let comp_source = String::from("3>2");
+        let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
+        let mut token_iter = comp_tokens.iter().peekable();
+        assert_eq!(
+            Comparison::parse(&mut token_iter),
+            Ok(Comparison {
+                term: Term {
+                    factor: Factor {
+                        unary: Unary::Primary(Primary::Number(3.0)),
+                        components: vec![]
+                    },
+                    components: vec![],
+                },
+                components: vec![ComparisonComponent::Greater(Term {
+                    factor: Factor {
+                        unary: Unary::Primary(Primary::Number(2.0)),
+                        components: vec![],
+                    },
+                    components: vec![],
+                })],
             })
         )
     }
