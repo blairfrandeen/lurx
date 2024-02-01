@@ -6,6 +6,7 @@ use std::iter::{Iterator, Peekable};
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnclosedParenthesis(Token),
+    UnexpectedToken(Token),
 }
 
 pub trait Parse {
@@ -271,7 +272,7 @@ impl Parse for Primary {
                         panic!("Unexpected EOF!")
                     }
                 }
-                _ => todo!(),
+                _ => return Err(ParseError::UnexpectedToken(next_token.clone().clone())),
             };
             tokens.next();
             Ok(primary)

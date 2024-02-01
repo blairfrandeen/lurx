@@ -19,6 +19,13 @@ impl ErrorReport for parser::ParseError {
     fn report(&self, source: &String) {
         match &self {
             parser::ParseError::UnclosedParenthesis(token) => report_unclosed(&token, &source),
+            parser::ParseError::UnexpectedToken(token) => {
+                println!(
+                    "Syntax error line line {}: unexpected token",
+                    token.line_num
+                );
+                show_error_token(&token, &source);
+            }
         }
     }
 }
