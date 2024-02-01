@@ -36,12 +36,12 @@ fn main() {
             for token in tokens.iter() {
                 println!("{token:?}");
             }
+            parser::parse_tokens(tokens.to_vec());
         }
         Err(ref scan_err) => {
             handle_scan_error(scan_err, &source);
         }
     }
-    parser::parse_tokens(toks.unwrap());
 }
 
 fn handle_scan_error(scan_error: &lexer::ScanError, source: &String) {
@@ -72,19 +72,29 @@ fn handle_unterminated_literal(line_num: usize, source: &String) {
 
 fn handle_invalid_tokens(invalid_tokens: &Vec<lexer::Token>, source: &String) {
     for token in invalid_tokens.iter() {
-        let current_line = &source
-            .lines()
-            .nth(token.line_num - 1)
-            .expect("source should have correct number of lines");
-        let char_index = &current_line
-            .find(&token.lexeme)
-            .expect("character should be in line");
         println!(
             "Syntax Error line {}: Invalid token ('{}')",
             token.line_num, token.lexeme
         );
-        println!("\t{current_line}");
-        println!("\t{: >1$}", "^", char_index + 1);
+        show_error_token(&token, &source);
         println!();
     }
+}
+
+fn show_error_token(token: &lexer::Token, source: &String) {
+    // TODO: This function currently only shows the first matching invalid token in a line; if
+    // there are more than one of the same type of invalid token, e.g. the source "dude? wtf?", only
+    // the instance of '?' following "dude" will be found. Implement a solution that shows both
+    // invalid tokens separately.
+    let current_line = &source
+        .lines()
+        .nth(token.line_num - 1)
+        .expect("source should have correct number of lines");
+    let char_index = &current_line
+        .find(&token.lexeme)
+        .expect("character should be in line");
+    println!("\t{current_line}");
+    let arrows = format!("{:^>1$}", "", &token.lexeme.len());
+    print!("\t{: >1$}", "", char_index);
+    println!("{arrows}");
 }

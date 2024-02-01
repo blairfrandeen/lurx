@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ScanError {
     #[error("invalid tokens")]
     InvalidToken(Vec<Token>),
@@ -247,6 +247,11 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                         None => token.type_ = TokenType::IDENTIFIER,
                     }
                 } else {
+                    while let Some(next_char) =
+                        chars.next_if(|c| !c.is_ascii_alphabetic() & !c.is_digit(10) & !(*c == '_'))
+                    {
+                        token.lexeme.push(next_char);
+                    }
                     token.type_ = TokenType::INVALID;
                 }
             }
@@ -374,5 +379,21 @@ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
     fn test_loxlox() {
         let loxlox = std::fs::read_to_string("tests/lox.lox").expect("file should exist");
         assert!(scan_source(&loxlox).is_ok())
+    }
+
+    #[test]
+    fn test_invalid() {
+        // invalid token lexemes should be all consecutive invalid characters
+        let invalid_source = String::from("?@^#");
+        let result = scan_source(&invalid_source);
+        assert_eq!(
+            result,
+            Err(ScanError::InvalidToken(vec![Token {
+                type_: TokenType::INVALID,
+                line_num: 1,
+                lexeme: String::from("?@^#"),
+                literal: None
+            }]))
+        );
     }
 }
