@@ -16,7 +16,7 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Comparison::parse(&mut token_iter);
+    let res = Equality::parse(&mut token_iter);
     dbg!(res);
 }
 
@@ -36,6 +36,33 @@ struct Equality {
 enum EqualityComponent {
     Equals(Comparison),
     NotEquals(Comparison),
+}
+
+impl Parse for Equality {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        let comparison = Comparison::parse(tokens)?;
+        let mut components: Vec<EqualityComponent> = Vec::new();
+
+        while let Some(next_token) = tokens.next_if(|tok| {
+            (tok.type_ == TokenType::EQUAL_EQUAL) | (tok.type_ == TokenType::BANG_EQUAL)
+        }) {
+            match next_token.type_ {
+                TokenType::EQUAL_EQUAL => {
+                    components.push(EqualityComponent::Equals(Comparison::parse(tokens)?))
+                }
+                TokenType::BANG_EQUAL => {
+                    components.push(EqualityComponent::NotEquals(Comparison::parse(tokens)?))
+                }
+                _ => panic!("unexpected token!"),
+            }
+        }
+        Ok(Equality {
+            comparison,
+            components,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -383,5 +410,37 @@ mod tests {
                 })],
             })
         )
+    }
+
+    #[test]
+    fn test_equality() {
+        let comp_source = String::from("true!=false");
+        let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
+        let mut token_iter = comp_tokens.iter().peekable();
+        assert_eq!(
+            Equality::parse(&mut token_iter),
+            Ok(Equality {
+                comparison: Comparison {
+                    term: Term {
+                        factor: Factor {
+                            unary: Unary::Primary(Primary::True),
+                            components: vec![],
+                        },
+                        components: vec![],
+                    },
+                    components: vec![],
+                },
+                components: vec![EqualityComponent::NotEquals(Comparison {
+                    term: Term {
+                        factor: Factor {
+                            unary: Unary::Primary(Primary::False),
+                            components: vec![],
+                        },
+                        components: vec![],
+                    },
+                    components: vec![],
+                })]
+            })
+        );
     }
 }
