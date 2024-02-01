@@ -16,7 +16,7 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Factor::parse(&mut token_iter);
+    let res = Term::parse(&mut token_iter);
     dbg!(res);
 }
 
@@ -62,6 +62,25 @@ struct Term {
 enum TermComponent {
     Add(Factor),
     Sub(Factor),
+}
+
+impl Parse for Term {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        let factor = Factor::parse(tokens)?;
+        let mut components: Vec<TermComponent> = Vec::new();
+        while let Some(next_token) =
+            tokens.next_if(|tok| (tok.type_ == TokenType::PLUS) | (tok.type_ == TokenType::MINUS))
+        {
+            match next_token.type_ {
+                TokenType::PLUS => components.push(TermComponent::Add(Factor::parse(tokens)?)),
+                TokenType::MINUS => components.push(TermComponent::Sub(Factor::parse(tokens)?)),
+                _ => panic!("unexpected token!"),
+            }
+        }
+        Ok(Term { factor, components })
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -274,6 +293,37 @@ mod tests {
                     FactorComponent::Div(Unary::Minus(Box::new(Unary::Primary(Primary::Number(
                         2.0
                     )))))
+                ]
+            })
+        )
+    }
+
+    #[test]
+    fn test_term() {
+        let term_source = String::from("5*8/-2+3-7");
+        let term_tokens = crate::lexer::scan_source(&term_source).unwrap();
+        let mut token_iter = term_tokens.iter().peekable();
+        assert_eq!(
+            Term::parse(&mut token_iter),
+            Ok(Term {
+                factor: Factor {
+                    unary: Unary::Primary(Primary::Number(5.0)),
+                    components: vec![
+                        FactorComponent::Mul(Unary::Primary(Primary::Number(8.0))),
+                        FactorComponent::Div(Unary::Minus(Box::new(Unary::Primary(
+                            Primary::Number(2.0)
+                        ))))
+                    ]
+                },
+                components: vec![
+                    TermComponent::Add(Factor {
+                        unary: Unary::Primary(Primary::Number(3.0)),
+                        components: vec![]
+                    }),
+                    TermComponent::Sub(Factor {
+                        unary: Unary::Primary(Primary::Number(7.0)),
+                        components: vec![]
+                    })
                 ]
             })
         )
