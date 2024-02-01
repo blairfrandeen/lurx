@@ -16,14 +16,13 @@ pub trait Parse {
         Self: Sized;
 }
 
-pub fn parse_tokens(tokens: Vec<Token>) {
+pub fn parse_tokens(tokens: Vec<Token>) -> Result<Expression, ParseError> {
     let mut token_iter = tokens.iter().peekable();
-    let res = Expression::parse(&mut token_iter);
-    dbg!(res);
+    Expression::parse(&mut token_iter)
 }
 
 #[derive(Debug, PartialEq)]
-enum Expression {
+pub enum Expression {
     Equality(Equality),
     // TODO in future chapters
 }

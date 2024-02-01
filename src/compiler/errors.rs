@@ -15,6 +15,23 @@ impl ErrorReport for lexer::ScanError {
     }
 }
 
+impl ErrorReport for parser::ParseError {
+    fn report(&self, source: &String) {
+        match &self {
+            parser::ParseError::UnclosedParenthesis(token) => report_unclosed(&token, &source),
+        }
+    }
+}
+
+fn report_unclosed(token: &lexer::Token, source: &String) {
+    println!(
+        "Syntax Error line {}: Unclosed Parenthesis!",
+        token.line_num
+    );
+    show_error_token(&token, &source);
+    println!();
+}
+
 fn report_unterminated_literal(line_num: usize, source: &String) {
     let current_line = &source
         .lines()

@@ -43,5 +43,13 @@ fn main() {
             std::process::exit(1);
         }
     };
-    parser::parse_tokens(tokens);
+
+    let ast = match parser::parse_tokens(tokens) {
+        Ok(tree) => dbg!(tree),
+        Err(parse_err) => {
+            parse_err.report(&source);
+            std::process::exit(1);
+        }
+    };
+    dbg!(ast);
 }
