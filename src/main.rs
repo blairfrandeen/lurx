@@ -1,6 +1,7 @@
 pub mod compiler;
 
 use clap::{CommandFactory, Parser};
+use compiler::errors::ErrorReport;
 use compiler::{lexer, parser};
 
 use std::fs;
@@ -30,71 +31,17 @@ fn main() {
         Args::command().print_help().unwrap();
         std::process::exit(1);
     }
-    let toks = lexer::scan_source(&source);
-    match toks {
-        Ok(ref tokens) => {
-            for token in tokens.iter() {
+    let tokens = match lexer::scan_source(&source) {
+        Ok(ref toks) => {
+            for token in toks.iter() {
                 println!("{token:?}");
             }
-            parser::parse_tokens(tokens.to_vec());
+            toks.clone()
         }
         Err(ref scan_err) => {
-            handle_scan_error(scan_err, &source);
+            scan_err.report(&source);
+            std::process::exit(1);
         }
-    }
-}
-
-fn handle_scan_error(scan_error: &lexer::ScanError, source: &String) {
-    match scan_error {
-        lexer::ScanError::InvalidToken(ref tokens) => handle_invalid_tokens(&tokens, &source),
-        lexer::ScanError::UnterminatedStringLiteral(line_num) => {
-            handle_unterminated_literal(*line_num, &source)
-        }
-    }
-}
-
-fn handle_unterminated_literal(line_num: usize, source: &String) {
-    let current_line = &source
-        .lines()
-        .nth(line_num - 1)
-        .expect("source should have correct number of lines");
-    let char_index = &current_line
-        .rfind('"')
-        .expect("character should be in line");
-    println!(
-        "Syntax Error line {}: Unterminated string literal",
-        line_num
-    );
-    println!("\t{current_line}");
-    println!("\t{: >1$}", "^", char_index + 1);
-    println!();
-}
-
-fn handle_invalid_tokens(invalid_tokens: &Vec<lexer::Token>, source: &String) {
-    for token in invalid_tokens.iter() {
-        println!(
-            "Syntax Error line {}: Invalid token ('{}')",
-            token.line_num, token.lexeme
-        );
-        show_error_token(&token, &source);
-        println!();
-    }
-}
-
-fn show_error_token(token: &lexer::Token, source: &String) {
-    // TODO: This function currently only shows the first matching invalid token in a line; if
-    // there are more than one of the same type of invalid token, e.g. the source "dude? wtf?", only
-    // the instance of '?' following "dude" will be found. Implement a solution that shows both
-    // invalid tokens separately.
-    let current_line = &source
-        .lines()
-        .nth(token.line_num - 1)
-        .expect("source should have correct number of lines");
-    let char_index = &current_line
-        .find(&token.lexeme)
-        .expect("character should be in line");
-    println!("\t{current_line}");
-    let arrows = format!("{:^>1$}", "", &token.lexeme.len());
-    print!("\t{: >1$}", "", char_index);
-    println!("{arrows}");
+    };
+    parser::parse_tokens(tokens);
 }
