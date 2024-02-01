@@ -251,7 +251,21 @@ impl Parse for Primary {
                 TokenType::FALSE => Primary::False,
                 TokenType::TRUE => Primary::True,
                 TokenType::NIL => Primary::Nil,
-                TokenType::LEFT_PAREN => todo!(),
+                TokenType::LEFT_PAREN => {
+                    tokens.next(); // consume the opening parenthesis
+                    let group = Primary::Group(Box::new(Expression::parse(tokens)?));
+                    if let Some(closing_paren) = tokens.next() {
+                        match closing_paren.type_ {
+                            // return from the function early here, because we've
+                            // already consumed the closing parenthesis and want the
+                            // token immediately after that
+                            TokenType::RIGHT_PAREN => return Ok(group),
+                            _ => panic!("unclosed parenthesis!"), // TODO: Error handling.
+                        }
+                    } else {
+                        panic!("Unexpected EOF!")
+                    }
+                }
                 _ => todo!(),
             };
             tokens.next();
