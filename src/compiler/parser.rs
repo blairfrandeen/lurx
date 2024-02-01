@@ -16,14 +16,23 @@ pub trait Parse {
 
 pub fn parse_tokens(tokens: Vec<Token>) {
     let mut token_iter = tokens.iter().peekable();
-    let res = Equality::parse(&mut token_iter);
+    let res = Expression::parse(&mut token_iter);
     dbg!(res);
 }
 
 #[derive(Debug, PartialEq)]
 enum Expression {
     Equality(Equality),
-    // TODO!
+    // TODO in future chapters
+}
+
+impl Parse for Expression {
+    fn parse<'a>(
+        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
+    ) -> Result<Self, ParseError> {
+        let equality = Equality::parse(tokens)?;
+        Ok(Self::Equality(equality))
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -441,6 +450,38 @@ mod tests {
                     components: vec![],
                 })]
             })
+        );
+    }
+
+    #[test]
+    fn test_expression() {
+        let expr_source = String::from("true!=false");
+        let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
+        let mut token_iter = expr_tokens.iter().peekable();
+        assert_eq!(
+            Expression::parse(&mut token_iter),
+            Ok(Expression::Equality(Equality {
+                comparison: Comparison {
+                    term: Term {
+                        factor: Factor {
+                            unary: Unary::Primary(Primary::True),
+                            components: vec![],
+                        },
+                        components: vec![],
+                    },
+                    components: vec![],
+                },
+                components: vec![EqualityComponent::NotEquals(Comparison {
+                    term: Term {
+                        factor: Factor {
+                            unary: Unary::Primary(Primary::False),
+                            components: vec![],
+                        },
+                        components: vec![],
+                    },
+                    components: vec![],
+                })]
+            }))
         );
     }
 }
