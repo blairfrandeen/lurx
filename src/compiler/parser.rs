@@ -4,7 +4,9 @@ use crate::lexer::{Token, TokenType};
 use std::iter::{Iterator, Peekable};
 
 #[derive(Debug, PartialEq)]
-pub enum ParseError {}
+pub enum ParseError {
+    UnclosedParenthesis(Token),
+}
 
 pub trait Parse {
     fn parse<'a>(
@@ -252,7 +254,7 @@ impl Parse for Primary {
                 TokenType::TRUE => Primary::True,
                 TokenType::NIL => Primary::Nil,
                 TokenType::LEFT_PAREN => {
-                    tokens.next(); // consume the opening parenthesis
+                    let opening_paren = tokens.next(); // consume the opening parenthesis
                     let group = Primary::Group(Box::new(Expression::parse(tokens)?));
                     if let Some(closing_paren) = tokens.next() {
                         match closing_paren.type_ {
@@ -260,7 +262,11 @@ impl Parse for Primary {
                             // already consumed the closing parenthesis and want the
                             // token immediately after that
                             TokenType::RIGHT_PAREN => return Ok(group),
-                            _ => panic!("unclosed parenthesis!"), // TODO: Error handling.
+                            _ => {
+                                return Err(ParseError::UnclosedParenthesis(
+                                    opening_paren.expect("opening parenthesis missing!").clone(),
+                                ))
+                            }
                         }
                     } else {
                         panic!("Unexpected EOF!")
