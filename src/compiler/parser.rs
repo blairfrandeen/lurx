@@ -194,7 +194,7 @@ impl Parse for Factor {
 }
 
 #[derive(Debug, PartialEq)]
-enum Unary {
+pub enum Unary {
     Minus(Box<Unary>),
     Not(Box<Unary>),
     Primary(Primary),
@@ -224,7 +224,7 @@ impl Parse for Unary {
 }
 
 #[derive(Debug, PartialEq)]
-enum Primary {
+pub enum Primary {
     Number(f32),
     StrLit(String),
     True,
