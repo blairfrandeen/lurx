@@ -10,15 +10,13 @@ pub enum ParseError {
 }
 
 pub trait Parse {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError>
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError>
     where
         Self: Sized;
 }
 
 pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expression>, ParseError> {
-    let mut token_iter = tokens.iter().peekable();
+    let mut token_iter = tokens.into_iter().peekable();
     let mut exprs: Vec<Expression> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
@@ -40,9 +38,7 @@ pub enum Expression {
 }
 
 impl Parse for Expression {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let equality = Equality::parse(tokens)?;
         Ok(Self::Equality(equality))
     }
@@ -61,9 +57,7 @@ enum EqualityComponent {
 }
 
 impl Parse for Equality {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let comparison = Comparison::parse(tokens)?;
         let mut components: Vec<EqualityComponent> = Vec::new();
 
@@ -102,9 +96,7 @@ enum ComparisonComponent {
 }
 
 impl Parse for Comparison {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let term = Term::parse(tokens)?;
         let mut components: Vec<ComparisonComponent> = Vec::new();
         while let Some(next_token) = tokens.next_if(|tok| {
@@ -144,9 +136,7 @@ enum TermComponent {
 }
 
 impl Parse for Term {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let factor = Factor::parse(tokens)?;
         let mut components: Vec<TermComponent> = Vec::new();
         while let Some(next_token) =
@@ -175,9 +165,7 @@ enum FactorComponent {
 }
 
 impl Parse for Factor {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let unary = Unary::parse(tokens)?;
         let mut components: Vec<FactorComponent> = Vec::new();
         while let Some(next_token) =
@@ -201,9 +189,7 @@ pub enum Unary {
 }
 
 impl Parse for Unary {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         if let Some(next_token) = tokens.peek() {
             let unary = match next_token.type_ {
                 TokenType::MINUS => {
@@ -234,9 +220,7 @@ pub enum Primary {
 }
 
 impl Parse for Primary {
-    fn parse<'a>(
-        tokens: &mut Peekable<impl Iterator<Item = &'a Token>>,
-    ) -> Result<Self, ParseError> {
+    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         if let Some(next_token) = tokens.peek() {
             let primary = match next_token.type_ {
                 TokenType::NUMLIT => {
@@ -313,7 +297,7 @@ mod tests {
     fn test_primary() {
         let primary_source = String::from("true false nil 55 \"hello\"");
         let primary_tokens = crate::lexer::scan_source(&primary_source).unwrap();
-        let mut token_iter = primary_tokens.iter().peekable();
+        let mut token_iter = primary_tokens.into_iter().peekable();
         assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::True));
         assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::False));
         assert_eq!(Primary::parse(&mut token_iter), Ok(Primary::Nil));
@@ -337,7 +321,7 @@ mod tests {
     fn test_unary_primary() {
         let unary_source = String::from("true false nil 55 \"hello\"");
         let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.iter().peekable();
+        let mut token_iter = unary_tokens.into_iter().peekable();
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Primary(Primary::True))
@@ -368,7 +352,7 @@ mod tests {
     fn test_unary_not() {
         let unary_source = String::from("!!true");
         let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.iter().peekable();
+        let mut token_iter = unary_tokens.into_iter().peekable();
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Not(Box::new(Unary::Not(Box::new(Unary::Primary(
@@ -381,7 +365,7 @@ mod tests {
     fn test_unary_minus() {
         let unary_source = String::from("-5");
         let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.iter().peekable();
+        let mut token_iter = unary_tokens.into_iter().peekable();
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Minus(Box::new(Unary::Primary(Primary::Number(5.0)))))
@@ -392,7 +376,7 @@ mod tests {
     fn test_factor() {
         let factor_source = String::from("5*8/-2");
         let factor_tokens = crate::lexer::scan_source(&factor_source).unwrap();
-        let mut token_iter = factor_tokens.iter().peekable();
+        let mut token_iter = factor_tokens.into_iter().peekable();
         assert_eq!(
             Factor::parse(&mut token_iter),
             Ok(Factor {
@@ -411,7 +395,7 @@ mod tests {
     fn test_term() {
         let term_source = String::from("5*8/-2+3-7");
         let term_tokens = crate::lexer::scan_source(&term_source).unwrap();
-        let mut token_iter = term_tokens.iter().peekable();
+        let mut token_iter = term_tokens.into_iter().peekable();
         assert_eq!(
             Term::parse(&mut token_iter),
             Ok(Term {
@@ -442,7 +426,7 @@ mod tests {
     fn test_comparison() {
         let comp_source = String::from("3>2");
         let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
-        let mut token_iter = comp_tokens.iter().peekable();
+        let mut token_iter = comp_tokens.into_iter().peekable();
         assert_eq!(
             Comparison::parse(&mut token_iter),
             Ok(Comparison {
@@ -468,7 +452,7 @@ mod tests {
     fn test_equality() {
         let comp_source = String::from("true!=false");
         let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
-        let mut token_iter = comp_tokens.iter().peekable();
+        let mut token_iter = comp_tokens.into_iter().peekable();
         assert_eq!(
             Equality::parse(&mut token_iter),
             Ok(Equality {
@@ -500,7 +484,7 @@ mod tests {
     fn test_expression() {
         let expr_source = String::from("true!=false");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        let mut token_iter = expr_tokens.iter().peekable();
+        let mut token_iter = expr_tokens.into_iter().peekable();
         assert_eq!(
             Expression::parse(&mut token_iter),
             Ok(Expression::Equality(Equality {
@@ -532,7 +516,6 @@ mod tests {
     fn test_unmatched_lparen() {
         let expr_source = String::from("((1+((2))/3)");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        let mut token_iter = expr_tokens.iter().peekable();
         assert_eq!(
             parse_tokens(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
@@ -546,7 +529,6 @@ mod tests {
     fn test_unmatched_rparen() {
         let expr_source = String::from("((1+2))/3)))");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        let mut token_iter = expr_tokens.iter().peekable();
         assert_eq!(
             parse_tokens(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
