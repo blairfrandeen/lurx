@@ -80,7 +80,19 @@ impl Evaluate for parser::Unary {
                 };
                 obj
             }
-            _ => todo!(),
+            parser::Unary::Minus(unary) => {
+                let mut obj = unary.evaluate()?;
+                obj.value = match obj.value {
+                    LoxValue::Number(n) => LoxValue::Number(-n),
+                    _ => {
+                        return Err(RuntimeError::InvalidOperand {
+                            operator: TokenType::MINUS,
+                            operand: obj.value,
+                        })
+                    }
+                };
+                obj
+            }
         };
         Ok(primary)
     }
@@ -109,9 +121,18 @@ mod tests {
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
+    #[test]
+    fn test_eval_unary_minus() {
+        let unary_source = String::from("---2");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.into_iter().peekable();
+        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let eval = un.evaluate().unwrap();
+        assert_eq!(eval.value, LoxValue::Number(-2.0));
+    }
 
     #[test]
-    fn test_eval_unary_invalid() {
+    fn test_eval_unary_not_invalid() {
         let unary_source = String::from("!2");
         let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
         let mut token_iter = unary_tokens.into_iter().peekable();
@@ -122,6 +143,22 @@ mod tests {
             Err(RuntimeError::InvalidOperand {
                 operator: TokenType::BANG,
                 operand: LoxValue::Number(2.0),
+            })
+        );
+    }
+
+    #[test]
+    fn test_eval_unary_minus_invalid() {
+        let unary_source = String::from("-true");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.into_iter().peekable();
+        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let eval = un.evaluate();
+        assert_eq!(
+            eval,
+            Err(RuntimeError::InvalidOperand {
+                operator: TokenType::MINUS,
+                operand: LoxValue::True,
             })
         );
     }
