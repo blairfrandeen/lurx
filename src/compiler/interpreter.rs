@@ -4,16 +4,21 @@ use crate::compiler::parser;
 
 use std::rc::Rc;
 
-#[derive(Debug)]
-pub enum RuntimeError {}
+#[derive(Debug, PartialEq)]
+pub enum RuntimeError {
+    InvalidOperand {
+        operator: TokenType,
+        operand: LoxValue,
+    },
+}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LoxObject {
     value: LoxValue,
 }
 
-#[derive(Debug)]
-enum LoxValue {
+#[derive(Debug, PartialEq)]
+pub enum LoxValue {
     StrLit(String),
     Number(f32),
     True,
@@ -51,7 +56,7 @@ impl Evaluate for parser::Primary {
             parser::Primary::True => LoxValue::True,
             parser::Primary::False => LoxValue::False,
             parser::Primary::Nil => LoxValue::Nil,
-            _ => todo!(),
+            parser::Primary::Group(expr) => todo!(),
         };
         Ok(LoxObject { value })
     }
@@ -66,7 +71,12 @@ impl Evaluate for parser::Unary {
                 obj.value = match obj.value {
                     LoxValue::True => LoxValue::False,
                     LoxValue::False => LoxValue::True,
-                    _ => todo!(),
+                    _ => {
+                        return Err(RuntimeError::InvalidOperand {
+                            operator: TokenType::BANG,
+                            operand: obj.value,
+                        })
+                    }
                 };
                 obj
             }
@@ -82,13 +92,37 @@ mod tests {
     use crate::compiler::parser::Parse;
 
     #[test]
-    fn test_eval_unary() {
+    fn test_eval_unary_not_true() {
         let unary_source = String::from("!true");
         let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
         let mut token_iter = unary_tokens.into_iter().peekable();
         let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let eval = un.evaluate().unwrap();
+        assert_eq!(eval.value, LoxValue::False);
+    }
+    #[test]
+    fn test_eval_unary_not_false() {
+        let unary_source = String::from("!false");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.into_iter().peekable();
+        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let eval = un.evaluate().unwrap();
+        assert_eq!(eval.value, LoxValue::True);
+    }
+
+    #[test]
+    fn test_eval_unary_invalid() {
+        let unary_source = String::from("!2");
+        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
+        let mut token_iter = unary_tokens.into_iter().peekable();
+        let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate();
-        dbg!(eval);
-        assert!(false);
+        assert_eq!(
+            eval,
+            Err(RuntimeError::InvalidOperand {
+                operator: TokenType::BANG,
+                operand: LoxValue::Number(2.0),
+            })
+        );
     }
 }
