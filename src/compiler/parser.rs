@@ -45,13 +45,13 @@ impl Parse for Expression {
 }
 
 #[derive(Debug, PartialEq)]
-struct Equality {
-    comparison: Comparison,
-    components: Vec<EqualityComponent>,
+pub struct Equality {
+    pub comparison: Comparison,
+    pub components: Vec<EqualityComponent>,
 }
 
 #[derive(Debug, PartialEq)]
-enum EqualityComponent {
+pub enum EqualityComponent {
     Equals(Comparison),
     NotEquals(Comparison),
 }
@@ -82,13 +82,13 @@ impl Parse for Equality {
 }
 
 #[derive(Debug, PartialEq)]
-struct Comparison {
-    term: Term,
-    components: Vec<ComparisonComponent>,
+pub struct Comparison {
+    pub term: Term,
+    pub components: Vec<ComparisonComponent>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ComparisonComponent {
+pub enum ComparisonComponent {
     Greater(Term),
     GreaterEquals(Term),
     Less(Term),
@@ -124,13 +124,13 @@ impl Parse for Comparison {
 }
 
 #[derive(Debug, PartialEq)]
-struct Term {
-    factor: Factor,
-    components: Vec<TermComponent>,
+pub struct Term {
+    pub factor: Factor,
+    pub components: Vec<TermComponent>,
 }
 
 #[derive(Debug, PartialEq)]
-enum TermComponent {
+pub enum TermComponent {
     Add(Factor),
     Sub(Factor),
 }
@@ -153,13 +153,13 @@ impl Parse for Term {
 }
 
 #[derive(Debug, PartialEq)]
-struct Factor {
-    unary: Unary,
-    components: Vec<FactorComponent>,
+pub struct Factor {
+    pub unary: Unary,
+    pub components: Vec<FactorComponent>,
 }
 
 #[derive(Debug, PartialEq)]
-enum FactorComponent {
+pub enum FactorComponent {
     Mul(Unary),
     Div(Unary),
 }
