@@ -1,4 +1,3 @@
-#![allow(unused)]
 use crate::lexer::{Token, TokenType};
 
 use std::iter::{Iterator, Peekable};
