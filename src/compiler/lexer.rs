@@ -301,9 +301,7 @@ impl Display for Literal {
 
 impl PartialEq for Token {
     fn eq(&self, other: &Self) -> bool {
-        (self.type_ == other.type_)
-            & (self.lexeme == other.lexeme)
-            & (self.literal == other.literal)
+        (self.type_ == other.type_) & (self.literal == other.literal)
     }
 }
 
