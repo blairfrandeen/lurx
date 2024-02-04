@@ -258,12 +258,15 @@ impl Parse for Primary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn tokens_from(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
+        let tokens = crate::lexer::scan_source(&source.to_string()).unwrap();
+        let token_iter = tokens.into_iter().peekable();
+        token_iter
+    }
 
     #[test]
     fn test_primary() {
-        let primary_source = String::from("true false nil 55 \"hello\"");
-        let primary_tokens = crate::lexer::scan_source(&primary_source).unwrap();
-        let mut token_iter = primary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("true false nil 55 \"hello\"");
         let mut expected_types = vec![
             TokenType::TRUE,
             TokenType::FALSE,
@@ -277,33 +280,45 @@ mod tests {
             assert_eq!(primary.token.type_, exp_type,);
         }
     }
-    /*
 
     #[test]
     fn test_unary_primary() {
-        let unary_source = String::from("true false nil 55 \"hello\"");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("true false nil 55 \"hello\"");
         assert_eq!(
             Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary::True))
+            Ok(Unary::Primary(Primary {
+                token: Token::from_type(TokenType::TRUE),
+                group: None
+            }))
         );
         assert_eq!(
             Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary::False))
+            Ok(Unary::Primary(Primary {
+                token: Token::from_type(TokenType::FALSE),
+                group: None
+            }))
         );
         assert_eq!(
             Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary::Nil))
+            Ok(Unary::Primary(Primary {
+                token: Token::from_type(TokenType::NIL),
+                group: None
+            }))
         );
-        match Unary::parse(&mut token_iter) {
-            Ok(Unary::Primary(Primary::Number(n))) => assert_eq!(n, 55.0),
-            _ => panic!(),
-        }
-        match Unary::parse(&mut token_iter) {
-            Ok(Unary::Primary(Primary::StrLit(n))) => assert_eq!(n, "hello".to_string()),
-            _ => panic!(),
-        }
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Primary(Primary {
+                token: Token::numlit(55.0),
+                group: None
+            }))
+        );
+        assert_eq!(
+            Unary::parse(&mut token_iter),
+            Ok(Unary::Primary(Primary {
+                token: Token::stringlit("hello".to_string()),
+                group: None
+            }))
+        );
         assert_eq!(
             token_iter.next().unwrap().type_,
             crate::lexer::TokenType::EOF
@@ -317,9 +332,16 @@ mod tests {
         let mut token_iter = unary_tokens.into_iter().peekable();
         assert_eq!(
             Unary::parse(&mut token_iter),
-            Ok(Unary::Not(Box::new(Unary::Not(Box::new(Unary::Primary(
-                Primary::True
-            ))))))
+            Ok(Unary::Unary {
+                operator: Token::from_type(TokenType::BANG),
+                unary: Box::new(Unary::Unary {
+                    operator: Token::from_type(TokenType::BANG),
+                    unary: Box::new(Unary::Primary(Primary {
+                        token: Token::from_type(TokenType::TRUE),
+                        group: None,
+                    }))
+                })
+            })
         );
     }
 
@@ -330,9 +352,16 @@ mod tests {
         let mut token_iter = unary_tokens.into_iter().peekable();
         assert_eq!(
             Unary::parse(&mut token_iter),
-            Ok(Unary::Minus(Box::new(Unary::Primary(Primary::Number(5.0)))))
+            Ok(Unary::Unary {
+                operator: Token::from_type(TokenType::MINUS),
+                unary: Box::new(Unary::Primary(Primary {
+                    token: Token::numlit(5.0),
+                    group: None,
+                }))
+            })
         );
     }
+    /*
 
     #[test]
     fn test_factor() {
