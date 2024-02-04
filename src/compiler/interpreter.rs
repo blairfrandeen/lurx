@@ -2,6 +2,7 @@
 use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::parser;
 
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
@@ -36,6 +37,19 @@ pub enum LoxValue {
     Nil,
 }
 
+impl Display for LoxValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &self {
+            LoxValue::StrLit(s) => write!(f, "{}", s)?,
+            LoxValue::Number(n) => write!(f, "{}", n)?,
+            LoxValue::True => write!(f, "True")?,
+            LoxValue::False => write!(f, "False")?,
+            LoxValue::Nil => write!(f, "Nil")?,
+        }
+        Ok(())
+    }
+}
+
 pub enum Expression {
     Literal(parser::Primary),
     Unary(Unary),
@@ -64,9 +78,9 @@ impl Evaluate for parser::Term {
         let mut components = self.components.iter();
         while let Some(component) = components.next() {
             let component_factor = component.factor.evaluate()?;
-            let factor_value = match factor.value {
-                LoxValue::Number(n) => n,
-                LoxValue::StrLit(s) => todo!(),
+            let is_str = match factor.value {
+                LoxValue::Number(_) => false,
+                LoxValue::StrLit(_) => true,
                 _ => {
                     return Err(RuntimeError::TypeError {
                         left: factor,
@@ -76,13 +90,36 @@ impl Evaluate for parser::Term {
                 }
             };
             factor.value = match component_factor.value {
-                LoxValue::Number(comp_value) => match component.operator.type_ {
-                    TokenType::PLUS => LoxValue::Number(factor_value + comp_value),
-                    TokenType::MINUS => LoxValue::Number(factor_value - comp_value),
-                    _ => panic!("Unexpected token in FactorComponent!"),
-                },
-                LoxValue::StrLit(s) => todo!(),
-
+                LoxValue::Number(comp_value) => {
+                    if !is_str {
+                        let factor_value = match factor.value {
+                            LoxValue::Number(n) => n,
+                            _ => panic!("Unexpected Type!"),
+                        };
+                        match component.operator.type_ {
+                            TokenType::PLUS => LoxValue::Number(factor_value + comp_value),
+                            TokenType::MINUS => LoxValue::Number(factor_value - comp_value),
+                            _ => panic!("Unexpected token in FactorComponent!"),
+                        }
+                    } else {
+                        return Err(RuntimeError::TypeError {
+                            left: factor,
+                            operator: component.operator.clone(),
+                            right: component_factor,
+                        });
+                    }
+                }
+                LoxValue::StrLit(ref s) => {
+                    if is_str & (component.operator.type_ == TokenType::PLUS) {
+                        LoxValue::StrLit(format!("{}{}", factor.value, s))
+                    } else {
+                        return Err(RuntimeError::TypeError {
+                            left: factor,
+                            operator: component.operator.clone(),
+                            right: component_factor,
+                        });
+                    }
+                }
                 _ => {
                     return Err(RuntimeError::TypeError {
                         left: factor,
@@ -370,6 +407,35 @@ mod tests {
             result,
             Ok(LoxObject {
                 value: LoxValue::Number(14.0)
+            })
+        )
+    }
+    #[test]
+    fn test_string_concat() {
+        let factor = parser::Term::from_str("\"Hello \" + \"World!\"");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::StrLit("Hello World!".to_string())
+            })
+        )
+    }
+
+    #[test]
+    fn test_string_sub_error() {
+        let factor = parser::Term::from_str("\"Hello \" - \"World!\"");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::StrLit("Hello ".to_string()),
+                },
+                operator: Token::from_type(TokenType::MINUS),
+                right: LoxObject {
+                    value: LoxValue::StrLit("World!".to_string()),
+                },
             })
         )
     }
