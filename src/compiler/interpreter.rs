@@ -6,7 +6,20 @@ use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
-    InvalidOperand { operator: Token, operand: LoxObject },
+    InvalidOperand {
+        operator: Token,
+        operand: LoxObject,
+    },
+    ZeroDivision {
+        left: LoxObject,
+        operator: Token,
+        right: LoxObject,
+    },
+    TypeError {
+        left: LoxObject,
+        operator: Token,
+        right: LoxObject,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -45,38 +58,48 @@ pub trait Evaluate {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError>;
 }
 
-impl Evaluate for parser::Primary {
+impl Evaluate for parser::Factor {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
-        let value = match &self.token.type_ {
-            TokenType::NUMLIT => LoxValue::Number(
-                match &self
-                    .token
-                    .literal
-                    .as_ref()
-                    .expect("NUMLIT token without a literal!")
-                {
-                    Literal::NumLit(val) => *val,
-                    _ => panic!("NUMLIT token with incorrect literal enum!"),
+        let mut unary = self.unary.evaluate()?;
+        let mut components = self.components.iter();
+        while let Some(component) = components.next() {
+            let component_unary = component.unary.evaluate()?;
+            let unary_value = match unary.value {
+                LoxValue::Number(n) => n,
+                _ => {
+                    return Err(RuntimeError::TypeError {
+                        left: unary,
+                        operator: component.operator.clone(),
+                        right: component_unary,
+                    })
+                }
+            };
+            unary.value = match component_unary.value {
+                LoxValue::Number(comp_value) => match component.operator.type_ {
+                    TokenType::SLASH => {
+                        if comp_value == 0.0 {
+                            return Err(RuntimeError::ZeroDivision {
+                                left: unary,
+                                operator: component.operator.clone(),
+                                right: component_unary,
+                            });
+                        }
+                        LoxValue::Number(unary_value / comp_value)
+                    }
+                    TokenType::STAR => LoxValue::Number(unary_value * comp_value),
+                    _ => panic!("Unexpected token in FactorComponent!"),
                 },
-            ),
-            TokenType::STRINGLIT => LoxValue::StrLit(
-                match &self
-                    .token
-                    .literal
-                    .as_ref()
-                    .expect("STRINGLIT token without a literal!")
-                {
-                    Literal::StringLit(val) => val.to_string(),
-                    _ => panic!("STRINGLIT token with incorrect literal enum!"),
-                },
-            ),
-            TokenType::TRUE => LoxValue::True,
-            TokenType::FALSE => LoxValue::False,
-            TokenType::NIL => LoxValue::Nil,
-            TokenType::LEFT_PAREN => todo!(),
-            _ => panic!("Invalid operator in Unary!"),
-        };
-        Ok(LoxObject { value })
+
+                _ => {
+                    return Err(RuntimeError::TypeError {
+                        left: unary,
+                        operator: component.operator.clone(),
+                        right: component_unary,
+                    })
+                }
+            };
+        }
+        Ok(unary)
     }
 }
 
@@ -112,6 +135,41 @@ impl Evaluate for parser::Unary {
             }
         };
         Ok(primary)
+    }
+}
+
+impl Evaluate for parser::Primary {
+    fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
+        let value = match &self.token.type_ {
+            TokenType::NUMLIT => LoxValue::Number(
+                match &self
+                    .token
+                    .literal
+                    .as_ref()
+                    .expect("NUMLIT token without a literal!")
+                {
+                    Literal::NumLit(val) => *val,
+                    _ => panic!("NUMLIT token with incorrect literal enum!"),
+                },
+            ),
+            TokenType::STRINGLIT => LoxValue::StrLit(
+                match &self
+                    .token
+                    .literal
+                    .as_ref()
+                    .expect("STRINGLIT token without a literal!")
+                {
+                    Literal::StringLit(val) => val.to_string(),
+                    _ => panic!("STRINGLIT token with incorrect literal enum!"),
+                },
+            ),
+            TokenType::TRUE => LoxValue::True,
+            TokenType::FALSE => LoxValue::False,
+            TokenType::NIL => LoxValue::Nil,
+            TokenType::LEFT_PAREN => todo!(),
+            _ => panic!("Invalid operator in Unary!"),
+        };
+        Ok(LoxObject { value })
     }
 }
 
@@ -173,5 +231,80 @@ mod tests {
                 },
             })
         );
+    }
+
+    #[test]
+    fn test_zero_div_error() {
+        let factor = parser::Factor::from_str("1/0");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::ZeroDivision {
+                left: LoxObject {
+                    value: LoxValue::Number(1.0),
+                },
+                operator: Token::from_type(TokenType::SLASH),
+                right: LoxObject {
+                    value: LoxValue::Number(0.0),
+                },
+            })
+        )
+    }
+
+    #[test]
+    fn test_mult() {
+        let factor = parser::Factor::from_str("7*7");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::Number(49.0)
+            },)
+        )
+    }
+
+    #[test]
+    fn test_div() {
+        let factor = parser::Factor::from_str("-49/-7");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::Number(7.0)
+            },)
+        )
+    }
+
+    #[test]
+    fn test_factor_type_err() {
+        let factor = parser::Factor::from_str("-49/\"seven\"");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::Number(-49.0),
+                },
+                operator: Token::from_type(TokenType::SLASH),
+                right: LoxObject {
+                    value: LoxValue::StrLit("seven".to_string()),
+                },
+            })
+        );
+        let factor = parser::Factor::from_str("true * nil");
+        dbg!(&factor);
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::True,
+                },
+                operator: Token::from_type(TokenType::STAR),
+                right: LoxObject {
+                    value: LoxValue::Nil,
+                },
+            })
+        )
     }
 }
