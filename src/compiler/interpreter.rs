@@ -58,6 +58,44 @@ pub trait Evaluate {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError>;
 }
 
+impl Evaluate for parser::Term {
+    fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
+        let mut factor = self.factor.evaluate()?;
+        let mut components = self.components.iter();
+        while let Some(component) = components.next() {
+            let component_factor = component.factor.evaluate()?;
+            let factor_value = match factor.value {
+                LoxValue::Number(n) => n,
+                LoxValue::StrLit(s) => todo!(),
+                _ => {
+                    return Err(RuntimeError::TypeError {
+                        left: factor,
+                        operator: component.operator.clone(),
+                        right: component_factor,
+                    })
+                }
+            };
+            factor.value = match component_factor.value {
+                LoxValue::Number(comp_value) => match component.operator.type_ {
+                    TokenType::PLUS => LoxValue::Number(factor_value + comp_value),
+                    TokenType::MINUS => LoxValue::Number(factor_value - comp_value),
+                    _ => panic!("Unexpected token in FactorComponent!"),
+                },
+                LoxValue::StrLit(s) => todo!(),
+
+                _ => {
+                    return Err(RuntimeError::TypeError {
+                        left: factor,
+                        operator: component.operator.clone(),
+                        right: component_factor,
+                    })
+                }
+            };
+        }
+        Ok(factor)
+    }
+}
+
 impl Evaluate for parser::Factor {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
         let mut unary = self.unary.evaluate()?;
@@ -292,7 +330,6 @@ mod tests {
             })
         );
         let factor = parser::Factor::from_str("true * nil");
-        dbg!(&factor);
         let result = factor.evaluate();
         assert_eq!(
             result,
@@ -304,6 +341,35 @@ mod tests {
                 right: LoxObject {
                     value: LoxValue::Nil,
                 },
+            })
+        )
+    }
+
+    #[test]
+    fn test_term_type_err() {
+        let factor = parser::Term::from_str("-49+true");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::Number(-49.0),
+                },
+                operator: Token::from_type(TokenType::PLUS),
+                right: LoxObject {
+                    value: LoxValue::True,
+                },
+            })
+        )
+    }
+    #[test]
+    fn test_term_addition() {
+        let factor = parser::Term::from_str("5*8/4 + 8/2");
+        let result = factor.evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::Number(14.0)
             })
         )
     }
