@@ -12,6 +12,15 @@ pub trait Parse {
     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError>
     where
         Self: Sized;
+
+    /// for testing only.
+    fn from_str(source: &str) -> Self
+    where
+        Self: Sized,
+    {
+        let mut token_iter = crate::lexer::token_iter(&source);
+        Self::parse(&mut token_iter).unwrap()
+    }
 }
 
 pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expression>, ParseError> {
@@ -258,15 +267,11 @@ impl Parse for Primary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn tokens_from(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
-        let tokens = crate::lexer::scan_source(&source.to_string()).unwrap();
-        let token_iter = tokens.into_iter().peekable();
-        token_iter
-    }
+    use crate::lexer::token_iter;
 
     #[test]
     fn test_primary() {
-        let mut token_iter = tokens_from("true false nil 55 \"hello\"");
+        let mut token_iter = token_iter("true false nil 55 \"hello\"");
         let mut expected_types = vec![
             TokenType::TRUE,
             TokenType::FALSE,
@@ -283,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_unary_primary() {
-        let mut token_iter = tokens_from("true false nil 55 \"hello\"");
+        let mut token_iter = token_iter("true false nil 55 \"hello\"");
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Primary(Primary {
@@ -327,19 +332,14 @@ mod tests {
 
     #[test]
     fn test_unary_not() {
-        let unary_source = String::from("!!true");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("!!true");
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Unary {
                 operator: Token::from_type(TokenType::BANG),
                 unary: Box::new(Unary::Unary {
                     operator: Token::from_type(TokenType::BANG),
-                    unary: Box::new(Unary::Primary(Primary {
-                        token: Token::from_type(TokenType::TRUE),
-                        group: None,
-                    }))
+                    unary: Box::new(Unary::Primary(Primary::from_str("true")))
                 })
             })
         );
@@ -347,36 +347,32 @@ mod tests {
 
     #[test]
     fn test_unary_minus() {
-        let unary_source = String::from("-5");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("-5");
         assert_eq!(
             Unary::parse(&mut token_iter),
             Ok(Unary::Unary {
                 operator: Token::from_type(TokenType::MINUS),
-                unary: Box::new(Unary::Primary(Primary {
-                    token: Token::numlit(5.0),
-                    group: None,
-                }))
+                unary: Box::new(Unary::Primary(Primary::from_str("5")))
             })
         );
     }
-    /*
 
     #[test]
     fn test_factor() {
-        let factor_source = String::from("5*8/-2");
-        let factor_tokens = crate::lexer::scan_source(&factor_source).unwrap();
-        let mut token_iter = factor_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("5*8/-2");
         assert_eq!(
             Factor::parse(&mut token_iter),
             Ok(Factor {
-                unary: Unary::Primary(Primary::Number(5.0)),
+                unary: Unary::from_str("5"),
                 components: vec![
-                    FactorComponent::Mul(Unary::Primary(Primary::Number(8.0))),
-                    FactorComponent::Div(Unary::Minus(Box::new(Unary::Primary(Primary::Number(
-                        2.0
-                    )))))
+                    FactorComponent {
+                        operator: Token::from_type(TokenType::STAR),
+                        unary: Unary::from_str("8")
+                    },
+                    FactorComponent {
+                        operator: Token::from_type(TokenType::SLASH),
+                        unary: Unary::from_str("-2")
+                    }
                 ]
             })
         )
@@ -384,30 +380,20 @@ mod tests {
 
     #[test]
     fn test_term() {
-        let term_source = String::from("5*8/-2+3-7");
-        let term_tokens = crate::lexer::scan_source(&term_source).unwrap();
-        let mut token_iter = term_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("5*8/-2+3-7");
         assert_eq!(
             Term::parse(&mut token_iter),
             Ok(Term {
-                factor: Factor {
-                    unary: Unary::Primary(Primary::Number(5.0)),
-                    components: vec![
-                        FactorComponent::Mul(Unary::Primary(Primary::Number(8.0))),
-                        FactorComponent::Div(Unary::Minus(Box::new(Unary::Primary(
-                            Primary::Number(2.0)
-                        ))))
-                    ]
-                },
+                factor: Factor::from_str("5*8/-2"),
                 components: vec![
-                    TermComponent::Add(Factor {
-                        unary: Unary::Primary(Primary::Number(3.0)),
-                        components: vec![]
-                    }),
-                    TermComponent::Sub(Factor {
-                        unary: Unary::Primary(Primary::Number(7.0)),
-                        components: vec![]
-                    })
+                    TermComponent {
+                        operator: Token::from_type(TokenType::PLUS),
+                        factor: Factor::from_str("3"),
+                    },
+                    TermComponent {
+                        operator: Token::from_type(TokenType::MINUS),
+                        factor: Factor::from_str("7"),
+                    },
                 ]
             })
         )
@@ -415,94 +401,42 @@ mod tests {
 
     #[test]
     fn test_comparison() {
-        let comp_source = String::from("3>2");
-        let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
-        let mut token_iter = comp_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("3>2");
         assert_eq!(
             Comparison::parse(&mut token_iter),
             Ok(Comparison {
-                term: Term {
-                    factor: Factor {
-                        unary: Unary::Primary(Primary::Number(3.0)),
-                        components: vec![]
-                    },
-                    components: vec![],
-                },
-                components: vec![ComparisonComponent::Greater(Term {
-                    factor: Factor {
-                        unary: Unary::Primary(Primary::Number(2.0)),
-                        components: vec![],
-                    },
-                    components: vec![],
-                })],
+                term: Term::from_str("3"),
+                components: vec![ComparisonComponent {
+                    operator: Token::from_type(TokenType::GREATER),
+                    term: Term::from_str("2"),
+                }],
             })
         )
     }
 
     #[test]
     fn test_equality() {
-        let comp_source = String::from("true!=false");
-        let comp_tokens = crate::lexer::scan_source(&comp_source).unwrap();
-        let mut token_iter = comp_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("true!=false");
         assert_eq!(
             Equality::parse(&mut token_iter),
             Ok(Equality {
-                comparison: Comparison {
-                    term: Term {
-                        factor: Factor {
-                            unary: Unary::Primary(Primary::True),
-                            components: vec![],
-                        },
-                        components: vec![],
-                    },
-                    components: vec![],
-                },
-                components: vec![EqualityComponent::NotEquals(Comparison {
-                    term: Term {
-                        factor: Factor {
-                            unary: Unary::Primary(Primary::False),
-                            components: vec![],
-                        },
-                        components: vec![],
-                    },
-                    components: vec![],
-                })]
+                comparison: Comparison::from_str("true"),
+                components: vec![EqualityComponent {
+                    operator: Token::from_type(TokenType::BANG_EQUAL),
+                    comparison: Comparison::from_str("false")
+                }]
             })
         );
     }
 
     #[test]
     fn test_expression() {
-        let expr_source = String::from("true!=false");
-        let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        let mut token_iter = expr_tokens.into_iter().peekable();
+        let mut token_iter = token_iter("true!=false");
         assert_eq!(
             Expression::parse(&mut token_iter),
-            Ok(Expression::Equality(Equality {
-                comparison: Comparison {
-                    term: Term {
-                        factor: Factor {
-                            unary: Unary::Primary(Primary::True),
-                            components: vec![],
-                        },
-                        components: vec![],
-                    },
-                    components: vec![],
-                },
-                components: vec![EqualityComponent::NotEquals(Comparison {
-                    term: Term {
-                        factor: Factor {
-                            unary: Unary::Primary(Primary::False),
-                            components: vec![],
-                        },
-                        components: vec![],
-                    },
-                    components: vec![],
-                })]
-            }))
+            Ok(Expression::Equality(Equality::from_str("true!=false")))
         );
     }
-    */
 
     #[test]
     fn test_unmatched_lparen() {

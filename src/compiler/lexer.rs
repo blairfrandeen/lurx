@@ -344,6 +344,13 @@ impl PartialEq for Token {
     }
 }
 
+/// for testing purposes
+pub fn token_iter(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
+    let tokens = crate::lexer::scan_source(&source.to_string()).unwrap();
+    let token_iter = tokens.into_iter().peekable();
+    token_iter
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

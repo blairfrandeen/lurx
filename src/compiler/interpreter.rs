@@ -119,29 +119,25 @@ impl Evaluate for parser::Unary {
 mod tests {
     use super::*;
     use crate::compiler::parser::Parse;
-    fn tokens_from(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
-        let tokens = crate::lexer::scan_source(&source.to_string()).unwrap();
-        let token_iter = tokens.into_iter().peekable();
-        token_iter
-    }
+    use crate::lexer::token_iter;
 
     #[test]
     fn test_eval_unary_not_true() {
-        let mut token_iter = tokens_from("!true");
+        let mut token_iter = token_iter("!true");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::False);
     }
     #[test]
     fn test_eval_unary_not_false() {
-        let mut token_iter = tokens_from("!false");
+        let mut token_iter = token_iter("!false");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_minus() {
-        let mut token_iter = tokens_from("---2");
+        let mut token_iter = token_iter("---2");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::Number(-2.0));
@@ -149,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_eval_unary_not_invalid() {
-        let mut token_iter = tokens_from("!2");
+        let mut token_iter = token_iter("!2");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
@@ -165,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_eval_unary_minus_invalid() {
-        let mut token_iter = tokens_from("-true");
+        let mut token_iter = token_iter("-true");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
