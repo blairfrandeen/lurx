@@ -195,16 +195,6 @@ impl Parse for Unary {
     }
 }
 
-// #[derive(Debug, PartialEq)]
-// pub enum Primary {
-//     Number(f32),
-//     StrLit(String),
-//     True,
-//     False,
-//     Nil,
-//     Group(Box<Expression>),
-// }
-
 #[derive(Debug, PartialEq)]
 pub struct Primary {
     pub token: Token,
