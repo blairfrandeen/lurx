@@ -50,9 +50,9 @@ pub struct Equality {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum EqualityComponent {
-    Equals(Comparison),
-    NotEquals(Comparison),
+pub struct EqualityComponent {
+    pub operator: Token,
+    pub comparison: Comparison,
 }
 
 impl Parse for Equality {
@@ -60,18 +60,13 @@ impl Parse for Equality {
         let comparison = Comparison::parse(tokens)?;
         let mut components: Vec<EqualityComponent> = Vec::new();
 
-        while let Some(next_token) = tokens.next_if(|tok| {
+        while let Some(operator) = tokens.next_if(|tok| {
             (tok.type_ == TokenType::EQUAL_EQUAL) | (tok.type_ == TokenType::BANG_EQUAL)
         }) {
-            match next_token.type_ {
-                TokenType::EQUAL_EQUAL => {
-                    components.push(EqualityComponent::Equals(Comparison::parse(tokens)?))
-                }
-                TokenType::BANG_EQUAL => {
-                    components.push(EqualityComponent::NotEquals(Comparison::parse(tokens)?))
-                }
-                _ => panic!("unexpected token!"),
-            }
+            components.push(EqualityComponent {
+                operator,
+                comparison: Comparison::parse(tokens)?,
+            });
         }
         Ok(Equality {
             comparison,
@@ -87,36 +82,25 @@ pub struct Comparison {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ComparisonComponent {
-    Greater(Term),
-    GreaterEquals(Term),
-    Less(Term),
-    LessEquals(Term),
+pub struct ComparisonComponent {
+    pub operator: Token,
+    pub term: Term,
 }
 
 impl Parse for Comparison {
     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let term = Term::parse(tokens)?;
         let mut components: Vec<ComparisonComponent> = Vec::new();
-        while let Some(next_token) = tokens.next_if(|tok| {
+        while let Some(operator) = tokens.next_if(|tok| {
             (tok.type_ == TokenType::GREATER)
                 | (tok.type_ == TokenType::GREATER_EQUAL)
                 | (tok.type_ == TokenType::LESS)
                 | (tok.type_ == TokenType::LESS_EQUAL)
         }) {
-            match next_token.type_ {
-                TokenType::GREATER => {
-                    components.push(ComparisonComponent::Greater(Term::parse(tokens)?))
-                }
-                TokenType::GREATER_EQUAL => {
-                    components.push(ComparisonComponent::GreaterEquals(Term::parse(tokens)?))
-                }
-                TokenType::LESS => components.push(ComparisonComponent::Less(Term::parse(tokens)?)),
-                TokenType::LESS_EQUAL => {
-                    components.push(ComparisonComponent::LessEquals(Term::parse(tokens)?))
-                }
-                _ => panic!("unexpected token!"),
-            }
+            components.push(ComparisonComponent {
+                operator,
+                term: Term::parse(tokens)?,
+            });
         }
         Ok(Comparison { term, components })
     }
@@ -129,23 +113,22 @@ pub struct Term {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum TermComponent {
-    Add(Factor),
-    Sub(Factor),
+pub struct TermComponent {
+    pub operator: Token,
+    pub factor: Factor,
 }
 
 impl Parse for Term {
     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let factor = Factor::parse(tokens)?;
         let mut components: Vec<TermComponent> = Vec::new();
-        while let Some(next_token) =
+        while let Some(operator) =
             tokens.next_if(|tok| (tok.type_ == TokenType::PLUS) | (tok.type_ == TokenType::MINUS))
         {
-            match next_token.type_ {
-                TokenType::PLUS => components.push(TermComponent::Add(Factor::parse(tokens)?)),
-                TokenType::MINUS => components.push(TermComponent::Sub(Factor::parse(tokens)?)),
-                _ => panic!("unexpected token!"),
-            }
+            components.push(TermComponent {
+                operator,
+                factor: Factor::parse(tokens)?,
+            });
         }
         Ok(Term { factor, components })
     }
@@ -158,23 +141,22 @@ pub struct Factor {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum FactorComponent {
-    Mul(Unary),
-    Div(Unary),
+pub struct FactorComponent {
+    pub operator: Token,
+    pub unary: Unary,
 }
 
 impl Parse for Factor {
     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
         let unary = Unary::parse(tokens)?;
         let mut components: Vec<FactorComponent> = Vec::new();
-        while let Some(next_token) =
+        while let Some(operator) =
             tokens.next_if(|tok| (tok.type_ == TokenType::STAR) | (tok.type_ == TokenType::SLASH))
         {
-            match next_token.type_ {
-                TokenType::STAR => components.push(FactorComponent::Mul(Unary::parse(tokens)?)),
-                TokenType::SLASH => components.push(FactorComponent::Div(Unary::parse(tokens)?)),
-                _ => panic!("unexpected token!"),
-            }
+            components.push(FactorComponent {
+                operator,
+                unary: Unary::parse(tokens)?,
+            });
         }
         Ok(Factor { unary, components })
     }
@@ -182,8 +164,7 @@ impl Parse for Factor {
 
 #[derive(Debug, PartialEq)]
 pub enum Unary {
-    Minus(Box<Unary>),
-    Not(Box<Unary>),
+    Unary { operator: Token, unary: Box<Unary> },
     Primary(Primary),
 }
 
@@ -192,12 +173,18 @@ impl Parse for Unary {
         if let Some(next_token) = tokens.peek() {
             let unary = match next_token.type_ {
                 TokenType::MINUS => {
-                    tokens.next();
-                    Unary::Minus(Box::new(Unary::parse(tokens)?))
+                    let operator = tokens.next().unwrap();
+                    Unary::Unary {
+                        operator,
+                        unary: Box::new(Unary::parse(tokens)?),
+                    }
                 }
                 TokenType::BANG => {
-                    tokens.next();
-                    Unary::Not(Box::new(Unary::parse(tokens)?))
+                    let operator = tokens.next().unwrap();
+                    Unary::Unary {
+                        operator,
+                        unary: Box::new(Unary::parse(tokens)?),
+                    }
                 }
                 _ => Unary::Primary(Primary::parse(tokens)?),
             };
@@ -208,82 +195,71 @@ impl Parse for Unary {
     }
 }
 
+// #[derive(Debug, PartialEq)]
+// pub enum Primary {
+//     Number(f32),
+//     StrLit(String),
+//     True,
+//     False,
+//     Nil,
+//     Group(Box<Expression>),
+// }
+
 #[derive(Debug, PartialEq)]
-pub enum Primary {
-    Number(f32),
-    StrLit(String),
-    True,
-    False,
-    Nil,
-    Group(Box<Expression>),
+pub struct Primary {
+    pub token: Token,
+    pub group: Option<Box<Expression>>,
 }
 
 impl Parse for Primary {
     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        if let Some(next_token) = tokens.peek() {
-            let primary = match next_token.type_ {
-                TokenType::NUMLIT => {
-                    let value = match next_token
-                        .literal
-                        .as_ref()
-                        .expect("NUMLIT token without an attached value!")
-                    {
-                        crate::compiler::lexer::Literal::NumLit(num) => num,
-                        _ => panic!("NUMLIT token with incorrect literal type!"),
-                    };
-                    Primary::Number(*value)
-                }
-                TokenType::STRINGLIT => {
-                    let value = match next_token
-                        .literal
-                        .as_ref()
-                        .expect("STRINGLIT token without an attached value!")
-                    {
-                        crate::compiler::lexer::Literal::StringLit(strlit) => strlit,
-                        _ => panic!("STRINGLIT token with incorrect literal type!"),
-                    };
-                    Primary::StrLit(value.clone())
-                }
-                TokenType::FALSE => Primary::False,
-                TokenType::TRUE => Primary::True,
-                TokenType::NIL => Primary::Nil,
-                TokenType::LEFT_PAREN => {
-                    let opening_paren = tokens.next(); // consume the opening parenthesis
-                    let group = Primary::Group(Box::new(Expression::parse(tokens)?));
-                    if let Some(closing_paren) = tokens.next() {
-                        match closing_paren.type_ {
-                            // return from the function early here, because we've
-                            // already consumed the closing parenthesis and want the
-                            // token immediately after that
-                            TokenType::RIGHT_PAREN => return Ok(group),
-                            _ => {
-                                return Err(ParseError::UnclosedParenthesis(
-                                    opening_paren.expect("opening parenthesis missing!").clone(),
-                                ))
-                            }
+        if let Some(next_token) = tokens.next_if(|tok| {
+            (tok.type_ == TokenType::NUMLIT)
+                | (tok.type_ == TokenType::STRINGLIT)
+                | (tok.type_ == TokenType::FALSE)
+                | (tok.type_ == TokenType::TRUE)
+                | (tok.type_ == TokenType::NIL)
+                | (tok.type_ == TokenType::LEFT_PAREN)
+        }) {
+            if next_token.type_ == TokenType::LEFT_PAREN {
+                let group = Box::new(Expression::parse(tokens)?);
+                if let Some(closing_paren) = tokens.next() {
+                    match closing_paren.type_ {
+                        // return from the function early here, because we've
+                        // already consumed the closing parenthesis and want the
+                        // token immediately after that
+                        TokenType::RIGHT_PAREN => {
+                            return Ok(Primary {
+                                token: next_token,
+                                group: Some(group),
+                            })
                         }
-                    } else {
-                        panic!("Unexpected EOF!")
+                        _ => return Err(ParseError::UnclosedParenthesis(next_token)),
                     }
+                } else {
+                    panic!("Unexpected EOF!")
                 }
-                TokenType::RIGHT_PAREN => {
-                    if let Some(closing_paren) = tokens.next() {
-                        match closing_paren.type_ {
-                            TokenType::RIGHT_PAREN => {
-                                return Err(ParseError::UnclosedParenthesis(closing_paren.clone()))
-                            }
-                            _ => panic!("closing parenthesis unmatched and disappeared!"),
+            } else if next_token.type_ == TokenType::RIGHT_PAREN {
+                if let Some(closing_paren) = tokens.next() {
+                    match closing_paren.type_ {
+                        TokenType::RIGHT_PAREN => {
+                            return Err(ParseError::UnclosedParenthesis(closing_paren.clone()))
                         }
-                    } else {
-                        panic!("Unexpected EOF!")
+                        _ => panic!("closing parenthesis unmatched and disappeared!"),
                     }
+                } else {
+                    panic!("Unexpected EOF!")
                 }
-                _ => return Err(ParseError::UnexpectedToken(next_token.clone().clone())),
-            };
-            tokens.next();
-            Ok(primary)
+            } else {
+                Ok(Primary {
+                    token: next_token.clone(),
+                    group: None,
+                })
+            }
         } else {
-            panic!("unexpected EOF!");
+            Err(ParseError::UnexpectedToken(
+                tokens.next().expect("unexpected EOF!"),
+            ))
         }
     }
 }
