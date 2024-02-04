@@ -119,30 +119,29 @@ impl Evaluate for parser::Unary {
 mod tests {
     use super::*;
     use crate::compiler::parser::Parse;
+    fn tokens_from(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
+        let tokens = crate::lexer::scan_source(&source.to_string()).unwrap();
+        let token_iter = tokens.into_iter().peekable();
+        token_iter
+    }
 
     #[test]
     fn test_eval_unary_not_true() {
-        let unary_source = String::from("!true");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("!true");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::False);
     }
     #[test]
     fn test_eval_unary_not_false() {
-        let unary_source = String::from("!false");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("!false");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_minus() {
-        let unary_source = String::from("---2");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("---2");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::Number(-2.0));
@@ -150,18 +149,13 @@ mod tests {
 
     #[test]
     fn test_eval_unary_not_invalid() {
-        let unary_source = String::from("!2");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("!2");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
-                operator: Token {
-                    type_: TokenType::BANG,
-                    ..Default::default()
-                },
+                operator: Token::from_type(TokenType::BANG),
                 operand: LoxObject {
                     value: LoxValue::Number(2.0)
                 },
@@ -171,18 +165,13 @@ mod tests {
 
     #[test]
     fn test_eval_unary_minus_invalid() {
-        let unary_source = String::from("-true");
-        let unary_tokens = crate::lexer::scan_source(&unary_source).unwrap();
-        let mut token_iter = unary_tokens.into_iter().peekable();
+        let mut token_iter = tokens_from("-true");
         let un = parser::Unary::parse(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
-                operator: Token {
-                    type_: TokenType::MINUS,
-                    ..Default::default()
-                },
+                operator: Token::from("-"),
                 operand: LoxObject {
                     value: LoxValue::True
                 },

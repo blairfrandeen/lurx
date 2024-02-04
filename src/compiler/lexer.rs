@@ -103,6 +103,45 @@ pub struct Token {
     pub lexeme: String,
 }
 
+/// Convenience / helper functions for quickly creating tokens for use in testing
+impl Token {
+    pub fn from_type(type_: TokenType) -> Self {
+        Token {
+            type_,
+            ..Default::default()
+        }
+    }
+    pub fn identifier(literal: String) -> Self {
+        Token {
+            type_: TokenType::IDENTIFIER,
+            literal: Some(Literal::StringLit(literal)),
+            ..Default::default()
+        }
+    }
+    pub fn stringlit(literal: String) -> Self {
+        Token {
+            type_: TokenType::STRINGLIT,
+            literal: Some(Literal::StringLit(literal)),
+            ..Default::default()
+        }
+    }
+    pub fn numlit(literal: f32) -> Self {
+        Token {
+            type_: TokenType::NUMLIT,
+            literal: Some(Literal::NumLit(literal)),
+            ..Default::default()
+        }
+    }
+
+    /// Make a token from a string. If the string results in multiple tokens,
+    /// only the first token will be made available.
+    /// This function will panic with invalid input and is intended for testing only.
+    pub fn from(source: &str) -> Self {
+        let results = scan_source(&source.to_string()).expect("Invalid Token!");
+        results.get(0).expect("No tokens found!").to_owned()
+    }
+}
+
 impl Default for Token {
     fn default() -> Self {
         Token {
