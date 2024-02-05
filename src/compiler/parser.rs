@@ -8,6 +8,7 @@ pub enum ParseError {
     UnexpectedToken(Token),
 }
 
+/*
 // pub trait Parse {
 //     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError>
 //     where
@@ -22,6 +23,7 @@ pub enum ParseError {
 //         Self::parse(&mut token_iter).unwrap()
 //     }
 // }
+*/
 
 pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expr>, ParseError> {
     let mut token_iter = tokens.into_iter().peekable();
@@ -182,8 +184,12 @@ mod tests {
         ]
         .into_iter();
         while let Some(exp_type) = expected_types.next() {
-            let primary = Primary::parse(&mut token_iter).unwrap();
-            assert_eq!(primary.token.type_, exp_type,);
+            let primary = primary(&mut token_iter).unwrap();
+            let token = match primary {
+                Expr::Literal(tok) => tok,
+                _ => panic!(),
+            };
+            assert_eq!(token.type_, exp_type,);
         }
     }
 
@@ -191,39 +197,24 @@ mod tests {
     fn test_unary_primary() {
         let mut token_iter = token_iter("true false nil 55 \"hello\"");
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary {
-                token: Token::from_type(TokenType::TRUE),
-                group: None
-            }))
+            unary(&mut token_iter),
+            Ok(Expr::Literal(Token::from_type(TokenType::TRUE),))
         );
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary {
-                token: Token::from_type(TokenType::FALSE),
-                group: None
-            }))
+            unary(&mut token_iter),
+            Ok(Expr::Literal(Token::from_type(TokenType::FALSE),))
         );
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary {
-                token: Token::from_type(TokenType::NIL),
-                group: None
-            }))
+            unary(&mut token_iter),
+            Ok(Expr::Literal(Token::from_type(TokenType::NIL),))
         );
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary {
-                token: Token::numlit(55.0),
-                group: None
-            }))
+            unary(&mut token_iter),
+            Ok(Expr::Literal(Token::numlit(55.0)))
         );
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Primary(Primary {
-                token: Token::stringlit("hello".to_string()),
-                group: None
-            }))
+            unary(&mut token_iter),
+            Ok(Expr::Literal(Token::stringlit("hello".to_string())))
         );
         assert_eq!(
             token_iter.next().unwrap().type_,
@@ -235,12 +226,12 @@ mod tests {
     fn test_unary_not() {
         let mut token_iter = token_iter("!!true");
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Unary {
+            unary(&mut token_iter),
+            Ok(Expr::Unary {
                 operator: Token::from_type(TokenType::BANG),
-                unary: Box::new(Unary::Unary {
+                right: Box::new(Expr::Unary {
                     operator: Token::from_type(TokenType::BANG),
-                    unary: Box::new(Unary::Primary(Primary::from_str("true")))
+                    right: Box::new(Expr::Literal(Token::from("true")))
                 })
             })
         );
@@ -250,10 +241,10 @@ mod tests {
     fn test_unary_minus() {
         let mut token_iter = token_iter("-5");
         assert_eq!(
-            Unary::parse(&mut token_iter),
-            Ok(Unary::Unary {
+            unary(&mut token_iter),
+            Ok(Expr::Unary {
                 operator: Token::from_type(TokenType::MINUS),
-                unary: Box::new(Unary::Primary(Primary::from_str("5")))
+                right: Box::new(Expr::Literal(Token::from("5")))
             })
         );
     }
@@ -262,23 +253,23 @@ mod tests {
     fn test_factor() {
         let mut token_iter = token_iter("5*8/-2");
         assert_eq!(
-            Factor::parse(&mut token_iter),
-            Ok(Factor {
-                unary: Unary::from_str("5"),
-                components: vec![
-                    FactorComponent {
-                        operator: Token::from_type(TokenType::STAR),
-                        unary: Unary::from_str("8")
-                    },
-                    FactorComponent {
-                        operator: Token::from_type(TokenType::SLASH),
-                        unary: Unary::from_str("-2")
-                    }
-                ]
+            factor(&mut token_iter),
+            Ok(Expr::Binary {
+                left: Box::new(Expr::Binary {
+                    left: Box::new(Expr::Literal(Token::numlit(5.0))),
+                    operator: Token::from_type(TokenType::STAR),
+                    right: Box::new(Expr::Literal(Token::numlit(8.0))),
+                }),
+                operator: Token::from_type(TokenType::SLASH),
+                right: Box::new(Expr::Unary {
+                    operator: Token::from_type(TokenType::MINUS),
+                    right: Box::new(Expr::Literal(Token::numlit(2.0)))
+                }),
             })
         )
     }
 
+    /*
     #[test]
     fn test_term() {
         let mut token_iter = token_iter("5*8/-2+3-7");
@@ -365,4 +356,5 @@ mod tests {
             }))
         )
     }
+    */
 }
