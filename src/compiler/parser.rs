@@ -8,29 +8,29 @@ pub enum ParseError {
     UnexpectedToken(Token),
 }
 
-pub trait Parse {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError>
-    where
-        Self: Sized;
+// pub trait Parse {
+//     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError>
+//     where
+//         Self: Sized;
 
-    /// for testing only.
-    fn from_str(source: &str) -> Self
-    where
-        Self: Sized,
-    {
-        let mut token_iter = crate::lexer::token_iter(&source);
-        Self::parse(&mut token_iter).unwrap()
-    }
-}
+//     /// for testing only.
+//     fn from_str(source: &str) -> Expr
+//     where
+//         Self: Sized,
+//     {
+//         let mut token_iter = crate::lexer::token_iter(&source);
+//         Self::parse(&mut token_iter).unwrap()
+//     }
+// }
 
-pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expression>, ParseError> {
+pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expr>, ParseError> {
     let mut token_iter = tokens.into_iter().peekable();
-    let mut exprs: Vec<Expression> = Vec::new();
+    let mut exprs: Vec<Expr> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
             TokenType::EOF => break,
             _ => {
-                let ex = Expression::parse(&mut token_iter)?;
+                let ex = expression(&mut token_iter)?;
                 exprs.push(ex);
             }
         }
@@ -40,227 +40,128 @@ pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expression>, ParseError> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Expression {
-    Equality(Equality),
-    // TODO in future chapters
+pub enum Expr {
+    Literal(Token),
+    Unary {
+        operator: Token,
+        right: Box<Expr>,
+    },
+    Binary {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
+    Grouping(Box<Expr>),
 }
 
-impl Parse for Expression {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        let equality = Equality::parse(tokens)?;
-        Ok(Self::Equality(equality))
+fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    equality(tokens)
+}
+
+fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let mut expr = comparison(tokens)?;
+
+    while let Some(operator) = tokens
+        .next_if(|tok| (tok.type_ == TokenType::EQUAL_EQUAL) | (tok.type_ == TokenType::BANG_EQUAL))
+    {
+        let right = comparison(tokens)?;
+        expr = Expr::Binary {
+            left: Box::new(expr),
+            operator,
+            right: Box::new(right),
+        };
     }
+    Ok(expr)
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Equality {
-    pub comparison: Comparison,
-    pub components: Vec<EqualityComponent>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct EqualityComponent {
-    pub operator: Token,
-    pub comparison: Comparison,
-}
-
-impl Parse for Equality {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        let comparison = Comparison::parse(tokens)?;
-        let mut components: Vec<EqualityComponent> = Vec::new();
-
-        while let Some(operator) = tokens.next_if(|tok| {
-            (tok.type_ == TokenType::EQUAL_EQUAL) | (tok.type_ == TokenType::BANG_EQUAL)
-        }) {
-            components.push(EqualityComponent {
-                operator,
-                comparison: Comparison::parse(tokens)?,
-            });
-        }
-        Ok(Equality {
-            comparison,
-            components,
-        })
+fn comparison(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let mut expr = term(tokens)?;
+    while let Some(operator) = tokens.next_if(|tok| {
+        (tok.type_ == TokenType::GREATER)
+            | (tok.type_ == TokenType::GREATER_EQUAL)
+            | (tok.type_ == TokenType::LESS)
+            | (tok.type_ == TokenType::LESS_EQUAL)
+    }) {
+        let right = term(tokens)?;
+        expr = Expr::Binary {
+            left: Box::new(expr),
+            operator,
+            right: Box::new(right),
+        };
     }
+    Ok(expr)
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Comparison {
-    pub term: Term,
-    pub components: Vec<ComparisonComponent>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ComparisonComponent {
-    pub operator: Token,
-    pub term: Term,
-}
-
-impl Parse for Comparison {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        let term = Term::parse(tokens)?;
-        let mut components: Vec<ComparisonComponent> = Vec::new();
-        while let Some(operator) = tokens.next_if(|tok| {
-            (tok.type_ == TokenType::GREATER)
-                | (tok.type_ == TokenType::GREATER_EQUAL)
-                | (tok.type_ == TokenType::LESS)
-                | (tok.type_ == TokenType::LESS_EQUAL)
-        }) {
-            components.push(ComparisonComponent {
-                operator,
-                term: Term::parse(tokens)?,
-            });
-        }
-        Ok(Comparison { term, components })
+fn term(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let mut expr = factor(tokens)?;
+    while let Some(operator) =
+        tokens.next_if(|tok| (tok.type_ == TokenType::PLUS) | (tok.type_ == TokenType::MINUS))
+    {
+        let right = factor(tokens)?;
+        expr = Expr::Binary {
+            left: Box::new(expr),
+            operator,
+            right: Box::new(right),
+        };
     }
+    Ok(expr)
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Term {
-    pub factor: Factor,
-    pub components: Vec<TermComponent>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct TermComponent {
-    pub operator: Token,
-    pub factor: Factor,
-}
-
-impl Parse for Term {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        let factor = Factor::parse(tokens)?;
-        let mut components: Vec<TermComponent> = Vec::new();
-        while let Some(operator) =
-            tokens.next_if(|tok| (tok.type_ == TokenType::PLUS) | (tok.type_ == TokenType::MINUS))
-        {
-            components.push(TermComponent {
-                operator,
-                factor: Factor::parse(tokens)?,
-            });
-        }
-        Ok(Term { factor, components })
+fn factor(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let mut expr = unary(tokens)?;
+    while let Some(operator) =
+        tokens.next_if(|tok| (tok.type_ == TokenType::STAR) | (tok.type_ == TokenType::SLASH))
+    {
+        let right = unary(tokens)?;
+        expr = Expr::Binary {
+            left: Box::new(expr),
+            operator,
+            right: Box::new(right),
+        };
     }
+    Ok(expr)
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Factor {
-    pub unary: Unary,
-    pub components: Vec<FactorComponent>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct FactorComponent {
-    pub operator: Token,
-    pub unary: Unary,
-}
-
-impl Parse for Factor {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        let unary = Unary::parse(tokens)?;
-        let mut components: Vec<FactorComponent> = Vec::new();
-        while let Some(operator) =
-            tokens.next_if(|tok| (tok.type_ == TokenType::STAR) | (tok.type_ == TokenType::SLASH))
-        {
-            components.push(FactorComponent {
-                operator,
-                unary: Unary::parse(tokens)?,
-            });
-        }
-        Ok(Factor { unary, components })
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Unary {
-    Unary { operator: Token, unary: Box<Unary> },
-    Primary(Primary),
-}
-
-impl Parse for Unary {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        if let Some(next_token) = tokens.peek() {
-            let unary = match next_token.type_ {
-                TokenType::MINUS => {
-                    let operator = tokens.next().unwrap();
-                    Unary::Unary {
-                        operator,
-                        unary: Box::new(Unary::parse(tokens)?),
-                    }
-                }
-                TokenType::BANG => {
-                    let operator = tokens.next().unwrap();
-                    Unary::Unary {
-                        operator,
-                        unary: Box::new(Unary::parse(tokens)?),
-                    }
-                }
-                _ => Unary::Primary(Primary::parse(tokens)?),
-            };
-            Ok(unary)
+fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    if let Some(next_token) = tokens.peek() {
+        if (next_token.type_ == TokenType::MINUS) | (next_token.type_ == TokenType::BANG) {
+            let operator = tokens.next().expect("missing token!");
+            let right = Box::new(unary(tokens)?);
+            Ok(Expr::Unary { operator, right })
         } else {
-            panic!("unexpected EOF!");
+            primary(tokens)
         }
+    } else {
+        panic!("unexpected EOF!");
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Primary {
-    pub token: Token,
-    pub group: Option<Box<Expression>>,
-}
-
-impl Parse for Primary {
-    fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self, ParseError> {
-        if let Some(next_token) = tokens.next_if(|tok| {
-            (tok.type_ == TokenType::NUMLIT)
-                | (tok.type_ == TokenType::STRINGLIT)
-                | (tok.type_ == TokenType::FALSE)
-                | (tok.type_ == TokenType::TRUE)
-                | (tok.type_ == TokenType::NIL)
-                | (tok.type_ == TokenType::LEFT_PAREN)
-                | (tok.type_ == TokenType::RIGHT_PAREN)
-        }) {
-            if next_token.type_ == TokenType::LEFT_PAREN {
-                let group = Box::new(Expression::parse(tokens)?);
-                if let Some(closing_paren) = tokens.next() {
-                    match closing_paren.type_ {
-                        // return from the function early here, because we've
-                        // already consumed the closing parenthesis and want the
-                        // token immediately after that
-                        TokenType::RIGHT_PAREN => {
-                            return Ok(Primary {
-                                token: next_token,
-                                group: Some(group),
-                            })
-                        }
-                        _ => return Err(ParseError::UnclosedParenthesis(next_token)),
-                    }
-                } else {
-                    panic!("Unexpected EOF!")
-                }
-            } else if next_token.type_ == TokenType::RIGHT_PAREN {
-                if let Some(closing_paren) = tokens.next() {
-                    match closing_paren.type_ {
-                        TokenType::RIGHT_PAREN => {
-                            return Err(ParseError::UnclosedParenthesis(closing_paren.clone()))
-                        }
-                        _ => panic!("closing parenthesis unmatched and disappeared!"),
-                    }
-                } else {
-                    panic!("Unexpected EOF!")
-                }
-            } else {
-                Ok(Primary {
-                    token: next_token.clone(),
-                    group: None,
-                })
+fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    if let Some(next_token) = tokens.next_if(|tok| {
+        (tok.type_ == TokenType::NUMLIT)
+            | (tok.type_ == TokenType::STRINGLIT)
+            | (tok.type_ == TokenType::FALSE)
+            | (tok.type_ == TokenType::TRUE)
+            | (tok.type_ == TokenType::NIL)
+    }) {
+        Ok(Expr::Literal(next_token))
+    } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::LEFT_PAREN) {
+        let expr = expression(tokens)?;
+        if let Some(closing_paren) = tokens.next() {
+            match closing_paren.type_ {
+                // return from the function early here, because we've
+                // already consumed the closing parenthesis and want the
+                // token immediately after that
+                TokenType::RIGHT_PAREN => return Ok(Expr::Grouping(Box::new(expr))),
+                _ => return Err(ParseError::UnclosedParenthesis(next_token)),
             }
         } else {
-            Err(ParseError::UnexpectedToken(
-                tokens.next().expect("unexpected EOF!"),
-            ))
+            panic!()
         }
+    } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::RIGHT_PAREN) {
+        Err(ParseError::UnclosedParenthesis(next_token.clone()))
+    } else {
+        panic!("Unexpected EOF!")
     }
 }
 
