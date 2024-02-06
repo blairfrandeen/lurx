@@ -424,6 +424,24 @@ mod tests {
     }
 
     #[test]
+    fn test_type_before_zero_div_error() {
+        let mut token_iter = token_iter("\"anything\"/0");
+        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::StrLit("anything".to_string())
+                },
+                operator: Token::from_type(TokenType::SLASH),
+                right: LoxObject {
+                    value: LoxValue::Number(0.0),
+                },
+            })
+        )
+    }
+
+    #[test]
     fn test_mult() {
         let mut token_iter = token_iter("7*7");
         let result = parser::expression(&mut token_iter).unwrap().evaluate();
