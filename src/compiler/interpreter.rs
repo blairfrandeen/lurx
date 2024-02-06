@@ -87,6 +87,13 @@ impl LoxObject {
             _ => None,
         }
     }
+    fn is_bool(&self) -> bool {
+        match &self.value {
+            LoxValue::True => true,
+            LoxValue::False => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for LoxObject {
@@ -212,7 +219,7 @@ fn compare_lox_value(
             TokenType::BANG_EQUAL => left != right,
             _ => panic!("unexpected token passed to compare_num"),
         };
-    } else if right.is_str() & left.is_str() {
+    } else if (right.is_str() & left.is_str()) | (right.is_bool() & left.is_bool()) {
         result = match operator.type_ {
             TokenType::EQUAL_EQUAL => left == right,
             TokenType::BANG_EQUAL => left != right,
@@ -624,6 +631,18 @@ mod tests {
                 right: LoxObject {
                     value: LoxValue::StrLit("tea".to_string()),
                 },
+            })
+        )
+    }
+
+    #[test]
+    fn test_cmp_bool() {
+        let mut token_iter = token_iter("true==false");
+        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::False
             })
         )
     }
