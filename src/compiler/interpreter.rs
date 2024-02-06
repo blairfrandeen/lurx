@@ -21,12 +21,12 @@ pub enum RuntimeError {
     },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LoxObject {
     value: LoxValue,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LoxValue {
     StrLit(String),
     Number(f32),
@@ -35,6 +35,19 @@ pub enum LoxValue {
     Nil,
 }
 
+pub struct Interpreter {
+    // TODO
+}
+
+impl Interpreter {
+    pub fn run(&self, expr: &parser::Expr) {
+        let result = expr.evaluate();
+        match result {
+            Ok(obj) => println!("{obj}"),
+            Err(err) => println!("{err:?}"),
+        }
+    }
+}
 impl LoxObject {
     fn is_number(&self) -> bool {
         match &self.value {
@@ -59,6 +72,12 @@ impl LoxObject {
             LoxValue::StrLit(s) => Some(s),
             _ => None,
         }
+    }
+}
+
+impl Display for LoxObject {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 
@@ -152,10 +171,41 @@ fn eval_binary(
                 });
             }
         }
+        // TokenType::GREATER => compare_num(&left, &operator, &right)?,
         _ => todo!(),
     };
     Ok(LoxObject { value })
 }
+
+/*
+fn compare_num(
+    left: &LoxObject,
+    operator: &Token,
+    right: &LoxObject,
+) -> Result<LoxValue, RuntimeError> {
+    let right_value = right.number();
+    let left_value = left.number();
+    if right_value.is_none() | left_value.is_none() {
+        return Err(RuntimeError::TypeError {
+            left: left.clone(),
+            operator: operator.clone(),
+            right: right.clone(),
+        });
+    }
+    let result = match operator.type_ {
+        TokenType::GREATER => left > right,
+        TokenType::GREATER_EQUAL => left >= right,
+        TokenType::LESS => left < right,
+        TokenType::LESS_EQUAL => left <= right,
+        _ => todo!(),
+    };
+    match result {
+        true => Ok(LoxValue::True),
+        false => Ok(LoxValue::False),
+    }
+    // }
+}
+*/
 
 impl Evaluate for parser::Expr {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
@@ -416,6 +466,36 @@ mod tests {
                 operator: Token::from_type(TokenType::MINUS),
                 right: LoxObject {
                     value: LoxValue::StrLit("World!".to_string()),
+                },
+            })
+        )
+    }
+
+    #[test]
+    fn test_cmp() {
+        let mut token_iter = token_iter("3>2");
+        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::True
+            })
+        )
+    }
+
+    #[test]
+    fn test_cmp_err() {
+        let mut token_iter = token_iter("3>true");
+        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        assert_eq!(
+            result,
+            Err(RuntimeError::TypeError {
+                left: LoxObject {
+                    value: LoxValue::Number(3.0),
+                },
+                operator: Token::from_type(TokenType::GREATER),
+                right: LoxObject {
+                    value: LoxValue::True,
                 },
             })
         )

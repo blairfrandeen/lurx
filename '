@@ -1,10 +1,11 @@
 pub mod compiler;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use compiler::errors::ErrorReport;
-use compiler::{interpreter, lexer, parser};
+use compiler::{lexer, parser};
 
 use std::fs;
+use std::io::{self, BufRead};
 use std::path::PathBuf;
 
 /// A Lox Implementation in Rust
@@ -39,9 +40,9 @@ fn main() {
 fn execute(source: &String) {
     let tokens = match lexer::scan_source(&source) {
         Ok(ref toks) => {
-            // for token in toks.iter() {
-            //     println!("{token:?}");
-            // }
+            for token in toks.iter() {
+                println!("{token:?}");
+            }
             toks.clone()
         }
         Err(ref scan_err) => {
@@ -57,21 +58,18 @@ fn execute(source: &String) {
             std::process::exit(1);
         }
     };
-    let interp = interpreter::Interpreter {};
-    let mut exprs = ast.iter();
-    while let Some(expr) = exprs.next() {
-        interp.run(expr);
-    }
+    dbg!(ast);
 }
-use rustyline;
-fn repl() -> rustyline::Result<()> {
-    let mut rl = rustyline::DefaultEditor::new()?;
+
+fn repl() -> io::Result<()> {
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    print!(">>> ");
     loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => execute(&line),
-            Err(_) => break,
-        }
+        buffer.clear();
+        stdin.lock().read_line(&mut buffer)?;
+        execute(&buffer);
+    print!(">>> ");
     }
     Ok(())
 }

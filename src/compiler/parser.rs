@@ -33,7 +33,6 @@ pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expr>, ParseError> {
             }
         }
     }
-    dbg!(token_iter.peek());
     Ok(exprs)
 }
 
