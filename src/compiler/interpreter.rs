@@ -270,21 +270,21 @@ mod tests {
     #[test]
     fn test_eval_unary_not_true() {
         let mut token_iter = token_iter("!true");
-        let un = parser::unary(&mut token_iter).unwrap();
+        let un = parser::expression(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::False);
     }
     #[test]
     fn test_eval_unary_not_false() {
         let mut token_iter = token_iter("!false");
-        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let un = parser::expression(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_minus() {
         let mut token_iter = token_iter("---2");
-        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let un = parser::expression(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::Number(-2.0));
     }
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn test_eval_unary_not_invalid() {
         let mut token_iter = token_iter("!2");
-        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let un = parser::expression(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
             eval,
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn test_eval_unary_minus_invalid() {
         let mut token_iter = token_iter("-true");
-        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let un = parser::expression(&mut token_iter).unwrap();
         let eval = un.evaluate();
         assert_eq!(
             eval,

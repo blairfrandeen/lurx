@@ -52,7 +52,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
 }
 
-fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+pub fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
     equality(tokens)
 }
 
