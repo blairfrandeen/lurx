@@ -8,22 +8,22 @@ pub enum ParseError {
     UnexpectedToken(Token),
 }
 
-/*
 // pub trait Parse {
 //     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError>
 //     where
 //         Self: Sized;
 
-//     /// for testing only.
-//     fn from_str(source: &str) -> Expr
-//     where
-//         Self: Sized,
-//     {
-//         let mut token_iter = crate::lexer::token_iter(&source);
-//         Self::parse(&mut token_iter).unwrap()
-//     }
-// }
-*/
+impl Expr {
+    /// Function to create expressions from string slices. Intended for testing
+    /// only, no error handling is included.
+    fn from_str(source: &str) -> Self
+    where
+        Self: Sized,
+    {
+        let mut token_iter = crate::lexer::token_iter(&source);
+        expression(&mut token_iter).unwrap()
+    }
+}
 
 pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expr>, ParseError> {
     let mut token_iter = tokens.into_iter().peekable();
@@ -269,24 +269,19 @@ mod tests {
         )
     }
 
-    /*
     #[test]
     fn test_term() {
         let mut token_iter = token_iter("5*8/-2+3-7");
         assert_eq!(
-            Term::parse(&mut token_iter),
-            Ok(Term {
-                factor: Factor::from_str("5*8/-2"),
-                components: vec![
-                    TermComponent {
-                        operator: Token::from_type(TokenType::PLUS),
-                        factor: Factor::from_str("3"),
-                    },
-                    TermComponent {
-                        operator: Token::from_type(TokenType::MINUS),
-                        factor: Factor::from_str("7"),
-                    },
-                ]
+            term(&mut token_iter),
+            Ok(Expr::Binary {
+                left: Box::new(Expr::Binary {
+                    left: Box::new(Expr::from_str("5*8/-2")),
+                    operator: Token::from_type(TokenType::PLUS),
+                    right: Box::new(Expr::from_str("3")),
+                }),
+                operator: Token::from_type(TokenType::MINUS),
+                right: Box::new(Expr::from_str("7")),
             })
         )
     }
@@ -295,13 +290,11 @@ mod tests {
     fn test_comparison() {
         let mut token_iter = token_iter("3>2");
         assert_eq!(
-            Comparison::parse(&mut token_iter),
-            Ok(Comparison {
-                term: Term::from_str("3"),
-                components: vec![ComparisonComponent {
-                    operator: Token::from_type(TokenType::GREATER),
-                    term: Term::from_str("2"),
-                }],
+            comparison(&mut token_iter),
+            Ok(Expr::Binary {
+                left: Box::new(Expr::from_str("3")),
+                operator: Token::from_type(TokenType::GREATER),
+                right: Box::new(Expr::from_str("2")),
             })
         )
     }
@@ -310,13 +303,11 @@ mod tests {
     fn test_equality() {
         let mut token_iter = token_iter("true!=false");
         assert_eq!(
-            Equality::parse(&mut token_iter),
-            Ok(Equality {
-                comparison: Comparison::from_str("true"),
-                components: vec![EqualityComponent {
-                    operator: Token::from_type(TokenType::BANG_EQUAL),
-                    comparison: Comparison::from_str("false")
-                }]
+            equality(&mut token_iter),
+            Ok(Expr::Binary {
+                left: Box::new(Expr::from_str("true")),
+                operator: Token::from_type(TokenType::BANG_EQUAL),
+                right: Box::new(Expr::from_str("false"))
             })
         );
     }
@@ -325,8 +316,12 @@ mod tests {
     fn test_expression() {
         let mut token_iter = token_iter("true!=false");
         assert_eq!(
-            Expression::parse(&mut token_iter),
-            Ok(Expression::Equality(Equality::from_str("true!=false")))
+            expression(&mut token_iter),
+            Ok(Expr::Binary {
+                left: Box::new(Expr::from_str("true")),
+                operator: Token::from_type(TokenType::BANG_EQUAL),
+                right: Box::new(Expr::from_str("false"))
+            })
         );
     }
 
@@ -356,5 +351,4 @@ mod tests {
             }))
         )
     }
-    */
 }
