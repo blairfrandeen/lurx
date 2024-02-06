@@ -26,41 +26,13 @@ pub struct LoxObject {
     value: LoxValue,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LoxValue {
     StrLit(String),
     Number(f32),
     True,
     False,
     Nil,
-}
-
-impl PartialEq for LoxValue {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            LoxValue::True => match other {
-                &LoxValue::True => true,
-                _ => false,
-            },
-            LoxValue::False => match other {
-                &LoxValue::False => true,
-                _ => false,
-            },
-
-            LoxValue::Nil => match other {
-                &LoxValue::Nil => true,
-                _ => false,
-            },
-            LoxValue::StrLit(s) => match other {
-                &LoxValue::StrLit(ref t) => s == t,
-                _ => false,
-            },
-            LoxValue::Number(n) => match other {
-                &LoxValue::Number(m) => *n == m,
-                _ => false,
-            },
-        }
-    }
 }
 
 impl PartialOrd for LoxValue {
