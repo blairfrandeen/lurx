@@ -8,11 +8,7 @@ pub enum ParseError {
     UnexpectedToken(Token),
 }
 
-// pub trait Parse {
-//     fn parse(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError>
-//     where
-//         Self: Sized;
-
+#[allow(unused)]
 impl Expr {
     /// Function to create expressions from string slices. Intended for testing
     /// only, no error handling is included.

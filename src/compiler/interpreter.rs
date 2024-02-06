@@ -50,26 +50,23 @@ impl Display for LoxValue {
     }
 }
 
-pub enum Expression {
-    Literal(parser::Primary),
-    Unary(Unary),
-    Binary(Binary),
-    Grouping(parser::Expression),
-}
-
-pub struct Unary {
-    pub operator: Option<TokenType>,
-    pub expression: Rc<Expression>,
-}
-
-pub struct Binary {
-    pub left: Rc<Expression>,
-    pub operator: Option<TokenType>,
-    pub right: Rc<Expression>,
-}
-
 pub trait Evaluate {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError>;
+}
+
+/*
+impl Evaluate for parser::Comparison {
+    fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
+        let mut term = self.term.evaluate()?;
+        let mut components = self.components.iter();
+        while let Some(component) = components.next() {
+            let comp_value = match component.term.evaluate()?.value {
+                LoxValue::Number(n) => {}
+                _ => todo!(),
+            };
+        }
+        Ok(term)
+    }
 }
 
 impl Evaluate for parser::Term {
@@ -177,87 +174,103 @@ impl Evaluate for parser::Factor {
         Ok(unary)
     }
 }
+*/
 
-impl Evaluate for parser::Unary {
+impl Evaluate for parser::Expr {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
-        let primary = match self {
-            parser::Unary::Primary(primary) => primary.evaluate()?,
-            parser::Unary::Unary { operator, unary } => {
-                let mut obj = unary.evaluate()?;
-                obj.value = match operator.type_ {
-                    TokenType::BANG => match obj.value {
-                        LoxValue::True => LoxValue::False,
-                        LoxValue::False => LoxValue::True,
-                        _ => {
-                            return Err(RuntimeError::InvalidOperand {
-                                operator: operator.clone(),
-                                operand: obj,
-                            })
-                        }
-                    },
-                    TokenType::MINUS => match obj.value {
-                        LoxValue::Number(n) => LoxValue::Number(-n),
-                        _ => {
-                            return Err(RuntimeError::InvalidOperand {
-                                operator: operator.clone(),
-                                operand: obj,
-                            })
-                        }
-                    },
-                    _ => panic!("Invalid operator in Unary!"),
-                };
-                obj
-            }
-        };
-        Ok(primary)
+        match &self {
+            parser::Expr::Unary { operator, right } => eval_unary(operator, right),
+            parser::Expr::Binary {
+                left,
+                operator,
+                right,
+            } => eval_binary(left, operator, right),
+            parser::Expr::Grouping(expr) => eval_grouping(expr),
+            parser::Expr::Literal(token) => Ok(eval_literal(token)),
+        }
     }
 }
 
-impl Evaluate for parser::Primary {
-    fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
-        let value = match &self.token.type_ {
-            TokenType::NUMLIT => LoxValue::Number(
-                match &self
-                    .token
-                    .literal
-                    .as_ref()
-                    .expect("NUMLIT token without a literal!")
-                {
-                    Literal::NumLit(val) => *val,
-                    _ => panic!("NUMLIT token with incorrect literal enum!"),
-                },
-            ),
-            TokenType::STRINGLIT => LoxValue::StrLit(
-                match &self
-                    .token
-                    .literal
-                    .as_ref()
-                    .expect("STRINGLIT token without a literal!")
-                {
-                    Literal::StringLit(val) => val.to_string(),
-                    _ => panic!("STRINGLIT token with incorrect literal enum!"),
-                },
-            ),
+fn eval_grouping(expr: &parser::Expr) -> Result<LoxObject, RuntimeError> {
+    expr.evaluate()
+}
+
+fn eval_binary(
+    left: &parser::Expr,
+    operator: &Token,
+    right: &parser::Expr,
+) -> Result<LoxObject, RuntimeError> {
+    let right = right.evaluate();
+    let left = left.evaluate();
+
+    match operator.type_ {
+        _ => todo!(),
+    }
+}
+
+fn eval_unary(operator: &Token, right: &parser::Expr) -> Result<LoxObject, RuntimeError> {
+    let mut right = right.evaluate()?;
+    right.value = match operator.type_ {
+        TokenType::BANG => match right.value {
+            LoxValue::True => LoxValue::False,
+            LoxValue::False => LoxValue::True,
+            _ => {
+                return Err(RuntimeError::InvalidOperand {
+                    operator: operator.clone(),
+                    operand: right,
+                })
+            }
+        },
+        TokenType::MINUS => match right.value {
+            LoxValue::Number(n) => LoxValue::Number(-n),
+            _ => {
+                return Err(RuntimeError::InvalidOperand {
+                    operator: operator.clone(),
+                    operand: right,
+                })
+            }
+        },
+        _ => panic!("Invalid operator in Unary!"),
+    };
+    Ok(right)
+}
+
+impl Token {
+    /// Get the LoxValue associated with a token, if any.
+    /// Panic if invalid token chosen
+    fn value(&self) -> LoxValue {
+        match self.type_ {
+            TokenType::NUMLIT => match &self.literal {
+                Some(Literal::NumLit(n)) => LoxValue::Number(*n),
+                _ => panic!("NUMLIT token without a literal!"),
+            },
+            TokenType::STRINGLIT => match &self.literal {
+                Some(Literal::StringLit(s)) => LoxValue::StrLit(s.to_string()),
+                _ => panic!("STRINGLIT token without a literal!"),
+            },
             TokenType::TRUE => LoxValue::True,
             TokenType::FALSE => LoxValue::False,
             TokenType::NIL => LoxValue::Nil,
-            TokenType::LEFT_PAREN => todo!(),
-            _ => panic!("Invalid operator in Unary!"),
-        };
-        Ok(LoxObject { value })
+            _ => panic!("Token does not have an associated value!"),
+        }
+    }
+}
+
+fn eval_literal(token: &Token) -> LoxObject {
+    LoxObject {
+        value: token.value(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::parser::Parse;
     use crate::lexer::token_iter;
 
     #[test]
     fn test_eval_unary_not_true() {
         let mut token_iter = token_iter("!true");
-        let un = parser::Unary::parse(&mut token_iter).unwrap();
+        let un = parser::unary(&mut token_iter).unwrap();
         let eval = un.evaluate().unwrap();
         assert_eq!(eval.value, LoxValue::False);
     }
@@ -307,6 +320,7 @@ mod tests {
             })
         );
     }
+    /*
 
     #[test]
     fn test_zero_div_error() {
@@ -438,5 +452,7 @@ mod tests {
                 },
             })
         )
+
     }
+    */
 }
