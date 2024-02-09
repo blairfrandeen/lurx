@@ -46,7 +46,7 @@ fn execute(source: &String) {
         }
         Err(ref scan_err) => {
             scan_err.report(&source);
-            std::process::exit(1);
+            return;
         }
     };
 
@@ -54,7 +54,7 @@ fn execute(source: &String) {
         Ok(tree) => tree,
         Err(parse_err) => {
             parse_err.report(&source);
-            std::process::exit(1);
+            return;
         }
     };
     let interp = interpreter::Interpreter {};
@@ -69,8 +69,14 @@ fn repl() -> rustyline::Result<()> {
     loop {
         let readline = rl.readline(">> ");
         match readline {
-            Ok(line) => execute(&line),
-            Err(_) => break,
+            Ok(line) => {
+                if line == "quit".to_string() {
+                    break;
+                } else {
+                    execute(&line)
+                }
+            }
+            Err(_) => continue,
         }
     }
     Ok(())

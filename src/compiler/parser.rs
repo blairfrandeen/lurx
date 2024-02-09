@@ -328,7 +328,6 @@ mod tests {
             parse_tokens(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::LEFT_PAREN,
-                lexeme: "(".to_string(),
                 ..Default::default()
             }))
         )
@@ -341,7 +340,6 @@ mod tests {
             parse_tokens(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::RIGHT_PAREN,
-                lexeme: ")".to_string(),
                 ..Default::default()
             }))
         )

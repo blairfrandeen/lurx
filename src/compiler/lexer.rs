@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, unused)]
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -10,7 +10,7 @@ pub enum ScanError {
     InvalidToken(Vec<Token>),
 
     #[error("Unterminated string literal starting on line {0}")]
-    UnterminatedStringLiteral(usize),
+    UnterminatedStringLiteral(Token),
 }
 
 fn keywords() -> HashMap<&'static str, TokenType> {
@@ -92,15 +92,15 @@ pub enum TokenType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     StringLit(String),
+    Ident(String),
     NumLit(f32),
 }
 
 #[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
-    pub line_num: usize,
+    pub loc: (usize, usize),
     pub literal: Option<Literal>,
-    pub lexeme: String,
 }
 
 /// Convenience / helper functions for quickly creating tokens for use in testing
@@ -146,25 +146,23 @@ impl Default for Token {
     fn default() -> Self {
         Token {
             type_: TokenType::INVALID,
-            line_num: 0,
+            loc: (0, 0),
             literal: None,
-            lexeme: "".to_string(),
         }
     }
 }
 
 pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
-    let mut chars = source.chars().peekable();
+    let mut chars = source.chars().enumerate().peekable();
     let mut tokens: Vec<Token> = Vec::new();
 
     let keywords: HashMap<&str, TokenType> = keywords();
     let mut line_num: usize = 1;
 
-    while let Some(current_char) = chars.next() {
-        let lexeme = String::from(current_char);
+    while let Some((loc_start, current_char)) = chars.next() {
+        let mut lexeme = String::from(current_char);
+        let mut loc_end = loc_start + 1;
         let mut token = Token {
-            line_num,
-            lexeme,
             ..Default::default()
         };
         match current_char {
@@ -192,39 +190,39 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             ';' => token.type_ = TokenType::SEMICOLON,
 
             // One or two character tokens
-            '!' => match chars.next_if(|c| *c == '=') {
+            '!' => match chars.next_if(|(_, c)| *c == '=') {
                 Some(c) => {
                     token.type_ = TokenType::BANG_EQUAL;
-                    token.lexeme.push(c);
+                    loc_end += 1;
                 }
                 None => token.type_ = TokenType::BANG,
             },
-            '=' => match chars.next_if(|c| *c == '=') {
+            '=' => match chars.next_if(|(_, c)| *c == '=') {
                 Some(c) => {
                     token.type_ = TokenType::EQUAL_EQUAL;
-                    token.lexeme.push(c);
+                    loc_end += 1;
                 }
                 None => token.type_ = TokenType::EQUAL,
             },
-            '>' => match chars.next_if(|c| *c == '=') {
+            '>' => match chars.next_if(|(_, c)| *c == '=') {
                 Some(c) => {
                     token.type_ = TokenType::GREATER_EQUAL;
-                    token.lexeme.push(c);
+                    loc_end += 1;
                 }
                 None => token.type_ = TokenType::GREATER,
             },
-            '<' => match chars.next_if(|c| *c == '=') {
+            '<' => match chars.next_if(|(_, c)| *c == '=') {
                 Some(c) => {
                     token.type_ = TokenType::LESS_EQUAL;
-                    token.lexeme.push(c);
+                    loc_end += 1;
                 }
                 None => token.type_ = TokenType::LESS,
             },
 
             // slash or single line comment
-            '/' => match chars.next_if(|c| *c == '/') {
+            '/' => match chars.next_if(|(_, c)| *c == '/') {
                 Some(_) => {
-                    while let Some(next_chr) = chars.next() {
+                    while let Some((_, next_chr)) = chars.next() {
                         if next_chr == '\n' {
                             break;
                         }
@@ -238,20 +236,23 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
             '"' => {
                 token.type_ = TokenType::STRINGLIT;
                 let mut str_lit = String::new();
-                while let Some(next_char) = chars.next_if(|c| *c != '"') {
+                while let Some((_, next_char)) = chars.next_if(|(_, c)| *c != '"') {
                     // TODO: allow for escaped quotes
                     if next_char == '\n' {
                         line_num += 1;
                     }
-                    token.lexeme.push(next_char);
+                    loc_end += 1;
                     str_lit.push(next_char);
                 }
                 match chars.next() {
-                    Some(next_char) => {
-                        token.lexeme.push(next_char);
+                    Some((_, next_char)) => {
+                        loc_end += 1; // TODO: necessary to increment here??
                         token.literal = Some(Literal::StringLit(str_lit));
                     }
-                    None => return Err(ScanError::UnterminatedStringLiteral(token.line_num)),
+                    None => {
+                        token.loc = (loc_start, loc_end);
+                        return Err(ScanError::UnterminatedStringLiteral(token.clone()));
+                    }
                 }
             }
 
@@ -260,46 +261,57 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                 // number literal
                 if current_char.is_digit(10) {
                     let mut found_decimal = false;
-                    while let Some(next_char) =
-                        chars.next_if(|c| ((*c == '.') & !found_decimal) | c.is_digit(10))
+                    while let Some((_, next_char)) =
+                        chars.next_if(|(_, c)| ((*c == '.') & !found_decimal) | c.is_digit(10))
                     {
-                        token.lexeme.push(next_char);
+                        lexeme.push(next_char);
+                        loc_end += 1;
                         if next_char == '.' {
                             found_decimal = true;
                         }
                     }
-                    let num_value: f32 = token.lexeme.parse().expect("Error parsing float!");
+                    let num_value: f32 = lexeme.parse().expect("Error parsing float!");
                     token.literal = Some(Literal::NumLit(num_value));
                     token.type_ = TokenType::NUMLIT;
 
                 // all keywords start and identifiers start with a letter
                 } else if current_char.is_ascii_alphabetic() | (current_char == '_') {
-                    while let Some(next_char) =
-                        chars.next_if(|c| c.is_ascii_alphabetic() | c.is_digit(10) | (*c == '_'))
+                    while let Some((_, next_char)) = chars
+                        .next_if(|(_, c)| c.is_ascii_alphabetic() | c.is_digit(10) | (*c == '_'))
                     {
-                        token.lexeme.push(next_char);
+                        lexeme.push(next_char);
                     }
 
                     // check for keyword
-                    match keywords.get(&token.lexeme.as_str()) {
-                        Some(token_type) => token.type_ = token_type.clone(),
-                        None => token.type_ = TokenType::IDENTIFIER,
+                    match keywords.get(&lexeme.as_str()) {
+                        Some(token_type) => {
+                            token.type_ = token_type.clone();
+                            loc_end = loc_start + lexeme.len();
+                        }
+                        None => {
+                            token.type_ = TokenType::IDENTIFIER;
+                            token.literal = Some(Literal::Ident(lexeme));
+                        }
                     }
                 } else {
-                    while let Some(next_char) =
-                        chars.next_if(|c| !c.is_ascii_alphabetic() & !c.is_digit(10) & !(*c == '_'))
-                    {
-                        token.lexeme.push(next_char);
+                    while let Some((_, next_char)) = chars.next_if(|(_, c)| {
+                        !c.is_ascii_alphabetic()
+                            & !c.is_digit(10)
+                            & !(*c == '_')
+                            & !c.is_ascii_whitespace()
+                    }) {
+                        lexeme.push(next_char);
                     }
                     token.type_ = TokenType::INVALID;
+                    loc_end = loc_start + lexeme.len();
                 }
             }
         };
+        token.loc = (loc_start, loc_end);
         tokens.push(token);
     }
     tokens.push(Token {
         type_: TokenType::EOF,
-        line_num,
         ..Default::default()
     });
     let invalid_tokens: Vec<Token> = tokens
@@ -318,7 +330,9 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match &self.type_ {
-            TokenType::IDENTIFIER => write!(f, "{:?} ({})", self.type_, self.lexeme)?,
+            TokenType::IDENTIFIER => {
+                write!(f, "{:?} ({})", self.type_, self.literal.as_ref().unwrap())?
+            }
             _ => match &self.literal {
                 Some(lit) => write!(f, "{:?} ({})", self.type_, lit)?,
                 None => write!(f, "{:?}", self.type_)?,
@@ -332,6 +346,7 @@ impl Display for Literal {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match &self {
             Literal::StringLit(s) => write!(f, "\"{s}\"")?,
+            Literal::Ident(s) => write!(f, "{s}")?,
             Literal::NumLit(n) => write!(f, "{n}")?,
         }
         Ok(())
@@ -379,7 +394,7 @@ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
         while let Some(lex) = lex_iter.next() {
             let test_tok = Token {
                 type_: TokenType::IDENTIFIER,
-                lexeme: lex.to_string(),
+                literal: Some(Literal::Ident(lex.to_string())),
                 ..Default::default()
             };
             let res = results.next().expect("should have enough tokens");
@@ -434,9 +449,7 @@ abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
             result,
             Err(ScanError::InvalidToken(vec![Token {
                 type_: TokenType::INVALID,
-                line_num: 1,
-                lexeme: String::from("?@^#"),
-                literal: None
+                ..Default::default()
             }]))
         );
     }
