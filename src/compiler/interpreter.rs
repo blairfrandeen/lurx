@@ -19,6 +19,7 @@ pub enum RuntimeError {
         operator: Token,
         right: LoxObject,
     },
+    NotImplemented,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -198,7 +199,7 @@ fn eval_binary(
         TokenType::LESS_EQUAL => compare_lox_value(&left, &operator, &right)?,
         TokenType::EQUAL_EQUAL => compare_lox_value(&left, &operator, &right)?,
         TokenType::BANG_EQUAL => compare_lox_value(&left, &operator, &right)?,
-        _ => todo!(),
+        _ => return Err(RuntimeError::NotImplemented),
     };
     Ok(LoxObject { value })
 }

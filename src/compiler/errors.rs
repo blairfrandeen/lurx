@@ -4,13 +4,6 @@ pub trait ErrorReport {
     fn report(&self, source: &String);
 }
 
-impl ErrorReport for interpreter::RuntimeError {
-    #[allow(unused)]
-    fn report(&self, source: &String) {
-        todo!()
-    }
-}
-
 impl ErrorReport for lexer::ScanError {
     fn report(&self, source: &String) {
         match &self {
@@ -30,6 +23,29 @@ impl ErrorReport for parser::ParseError {
                 println!("Syntax error line {:?}: unexpected token", token.loc);
                 show_error_token(&token, &source);
             }
+            parser::ParseError::NotImplemented(token) => {
+                println!("ParseError: Not Implemented ({token})")
+            }
+        }
+    }
+}
+
+impl ErrorReport for interpreter::RuntimeError {
+    #[allow(unused)]
+    fn report(&self, source: &String) {
+        match &self {
+            interpreter::RuntimeError::TypeError {
+                left,
+                operator,
+                right,
+            } => todo!(),
+            interpreter::RuntimeError::ZeroDivision {
+                left,
+                operator,
+                right,
+            } => todo!(),
+            interpreter::RuntimeError::InvalidOperand { operator, operand } => todo!(),
+            interpreter::RuntimeError::NotImplemented => println!("Not implemented!"),
         }
     }
 }

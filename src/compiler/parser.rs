@@ -6,6 +6,7 @@ use std::iter::{Iterator, Peekable};
 pub enum ParseError {
     UnclosedParenthesis(Token),
     UnexpectedToken(Token),
+    NotImplemented(Token),
 }
 
 #[allow(unused)]
@@ -144,21 +145,19 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
         Ok(Expr::Literal(next_token))
     } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::LEFT_PAREN) {
         let expr = expression(tokens)?;
-        if let Some(closing_paren) = tokens.next() {
-            match closing_paren.type_ {
-                // return from the function early here, because we've
-                // already consumed the closing parenthesis and want the
-                // token immediately after that
-                TokenType::RIGHT_PAREN => return Ok(Expr::Grouping(Box::new(expr))),
-                _ => return Err(ParseError::UnclosedParenthesis(next_token)),
-            }
-        } else {
-            panic!()
+        let closing_paren = tokens.next().expect("Unexpected EOF!");
+        match closing_paren.type_ {
+            // return from the function early here, because we've
+            // already consumed the closing parenthesis and want the
+            // token immediately after that
+            TokenType::RIGHT_PAREN => return Ok(Expr::Grouping(Box::new(expr))),
+            _ => return Err(ParseError::UnclosedParenthesis(next_token)),
         }
     } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::RIGHT_PAREN) {
         Err(ParseError::UnclosedParenthesis(next_token.clone()))
     } else {
-        panic!("Unexpected EOF!")
+        let next_token = tokens.next().expect("Unexpected EOF!");
+        Err(ParseError::NotImplemented(next_token.clone()))
     }
 }
 
