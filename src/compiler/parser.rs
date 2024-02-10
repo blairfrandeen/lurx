@@ -7,6 +7,8 @@ pub enum ParseError {
     UnclosedParenthesis(Token),
     UnexpectedToken(Token),
     NotImplemented(Token),
+    ExpectedToken { stmt: Stmt, token_type: TokenType },
+    MissingEof,
 }
 
 #[allow(unused)]
@@ -22,19 +24,48 @@ impl Expr {
     }
 }
 
-pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Expr>, ParseError> {
+#[derive(PartialEq, Debug)]
+pub struct Program {
+    pub statements: Vec<Stmt>,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
+pub fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
+    if let Some(next_token) = tokens.peek() {
+        let stmt = match next_token.type_ {
+            TokenType::PRINT => {
+                tokens.next(); // consume print token
+                Stmt::Print(expression(tokens)?)
+            }
+            _ => Stmt::Expression(expression(tokens)?),
+        };
+        match tokens.next_if(|tok| tok.type_ == TokenType::SEMICOLON) {
+            Some(_) => Ok(stmt),
+            _ => Err(ParseError::ExpectedToken {
+                stmt,
+                token_type: TokenType::SEMICOLON,
+            }),
+        }
+    } else {
+        panic!("Unexpected EOF!")
+    }
+}
+
+pub fn program(tokens: Vec<Token>) -> Result<Program, ParseError> {
     let mut token_iter = tokens.into_iter().peekable();
-    let mut exprs: Vec<Expr> = Vec::new();
+    let mut statements: Vec<Stmt> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
-            TokenType::EOF => break,
-            _ => {
-                let ex = expression(&mut token_iter)?;
-                exprs.push(ex);
-            }
+            TokenType::EOF => return Ok(Program { statements }),
+            _ => statements.push(statement(&mut token_iter)?),
         }
     }
-    Ok(exprs)
+    Err(ParseError::MissingEof)
 }
 
 #[derive(Debug, PartialEq)]
@@ -324,7 +355,7 @@ mod tests {
         let expr_source = String::from("((1+((2))/3)");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            parse_tokens(expr_tokens),
+            program(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::LEFT_PAREN,
                 ..Default::default()
@@ -336,7 +367,7 @@ mod tests {
         let expr_source = String::from("((1+2))/3)))");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            parse_tokens(expr_tokens),
+            program(expr_tokens),
             Err(ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::RIGHT_PAREN,
                 ..Default::default()

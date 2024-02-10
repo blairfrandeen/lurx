@@ -1,5 +1,5 @@
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::parser::Expr;
+use crate::compiler::parser::{Expr, Program, Stmt};
 
 use std::fmt::{Display, Formatter};
 
@@ -36,15 +36,6 @@ pub enum LoxValue {
     Nil,
 }
 
-pub struct Program {
-    statements: Vec<Stmt>,
-}
-
-pub enum Stmt {
-    Expression(Expr),
-    Print(Expr),
-}
-
 impl PartialOrd for LoxValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let self_value = match self {
@@ -64,11 +55,25 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn run(&self, expr: &Expr) {
-        let result = expr.evaluate();
-        match result {
-            Ok(obj) => println!("{obj}"),
-            Err(err) => println!("{err:?}"),
+    pub fn run(&self, prgm: &Program) {
+        let mut stmts = prgm.statements.iter();
+        while let Some(stmt) = stmts.next() {
+            match stmt.execute() {
+                Ok(()) => {}
+                Err(err) => println!("{err:?}"),
+            }
+        }
+    }
+}
+
+impl Stmt {
+    fn execute(&self) -> Result<(), RuntimeError> {
+        match &self {
+            Stmt::Print(expr) => {
+                println!("{}", expr.evaluate()?);
+                Ok(())
+            }
+            Stmt::Expression(_) => Ok(()),
         }
     }
 }

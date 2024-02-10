@@ -50,7 +50,7 @@ fn execute(source: &String) {
         }
     };
 
-    let ast = match parser::parse_tokens(tokens) {
+    let program = match parser::program(tokens) {
         Ok(tree) => tree,
         Err(parse_err) => {
             parse_err.report(&source);
@@ -58,10 +58,7 @@ fn execute(source: &String) {
         }
     };
     let interp = interpreter::Interpreter {};
-    let mut exprs = ast.iter();
-    while let Some(expr) = exprs.next() {
-        interp.run(expr);
-    }
+    interp.run(&program);
 }
 use rustyline;
 fn repl() -> rustyline::Result<()> {
