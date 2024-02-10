@@ -76,7 +76,10 @@ fn repl() -> rustyline::Result<()> {
                     execute(&line)
                 }
             }
-            Err(_) => continue,
+            Err(err) => match err {
+                rustyline::error::ReadlineError::Interrupted => break,
+                _ => continue,
+            },
         }
     }
     Ok(())
