@@ -1,5 +1,5 @@
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::parser;
+use crate::compiler::parser::Expr;
 
 use std::fmt::{Display, Formatter};
 
@@ -36,6 +36,15 @@ pub enum LoxValue {
     Nil,
 }
 
+pub struct Program {
+    statements: Vec<Stmt>,
+}
+
+pub enum Stmt {
+    Expression(Expr),
+    Print(Expr),
+}
+
 impl PartialOrd for LoxValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let self_value = match self {
@@ -55,7 +64,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn run(&self, expr: &parser::Expr) {
+    pub fn run(&self, expr: &Expr) {
         let result = expr.evaluate();
         match result {
             Ok(obj) => println!("{obj}"),
@@ -120,11 +129,7 @@ pub trait Evaluate {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError>;
 }
 
-fn eval_binary(
-    left: &parser::Expr,
-    operator: &Token,
-    right: &parser::Expr,
-) -> Result<LoxObject, RuntimeError> {
+fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
     let right = right.evaluate()?;
     let left = left.evaluate()?;
 
@@ -245,26 +250,26 @@ fn compare_lox_value(
     }
 }
 
-impl Evaluate for parser::Expr {
+impl Evaluate for Expr {
     fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
         match &self {
-            parser::Expr::Unary { operator, right } => eval_unary(operator, right),
-            parser::Expr::Binary {
+            Expr::Unary { operator, right } => eval_unary(operator, right),
+            Expr::Binary {
                 left,
                 operator,
                 right,
             } => eval_binary(left, operator, right),
-            parser::Expr::Grouping(expr) => eval_grouping(expr),
-            parser::Expr::Literal(token) => Ok(eval_literal(token)),
+            Expr::Grouping(expr) => eval_grouping(expr),
+            Expr::Literal(token) => Ok(eval_literal(token)),
         }
     }
 }
 
-fn eval_grouping(expr: &parser::Expr) -> Result<LoxObject, RuntimeError> {
+fn eval_grouping(expr: &Expr) -> Result<LoxObject, RuntimeError> {
     expr.evaluate()
 }
 
-fn eval_unary(operator: &Token, right: &parser::Expr) -> Result<LoxObject, RuntimeError> {
+fn eval_unary(operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
     let mut right = right.evaluate()?;
     right.value = match operator.type_ {
         TokenType::BANG => match right.value {
@@ -323,6 +328,7 @@ fn eval_literal(token: &Token) -> LoxObject {
 mod tests {
     use super::*;
     use crate::lexer::token_iter;
+    use crate::parser;
 
     #[test]
     fn test_eval_unary_not_true() {
