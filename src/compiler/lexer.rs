@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types, unused)]
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use thiserror::Error;
 
@@ -96,7 +96,7 @@ pub enum Literal {
     NumLit(f32),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Token {
     pub type_: TokenType,
     pub loc: (usize, usize),
@@ -329,6 +329,22 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
 
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match &self.type_ {
+            TokenType::IDENTIFIER => {
+                write!(f, "{:?} ({})", self.type_, self.literal.as_ref().unwrap())?
+            }
+            _ => match &self.literal {
+                Some(lit) => write!(f, "{:?} ({})", self.type_, lit)?,
+                None => write!(f, "{:?}", self.type_)?,
+            },
+        }
+        Ok(())
+    }
+}
+
+impl Debug for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}: ", self.loc.0, self.loc.1)?;
         match &self.type_ {
             TokenType::IDENTIFIER => {
                 write!(f, "{:?} ({})", self.type_, self.literal.as_ref().unwrap())?
