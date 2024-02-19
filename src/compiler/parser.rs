@@ -7,7 +7,7 @@ pub enum ParseError {
     UnclosedParenthesis(Token),
     UnexpectedToken(Token),
     NotImplemented(Token),
-    ExpectedToken { stmt: Stmt, token_type: TokenType },
+    ExpectedToken { decl: Decl, token_type: TokenType },
     MissingEof,
 }
 
@@ -26,13 +26,19 @@ impl Expr {
 
 #[derive(PartialEq, Debug)]
 pub struct Program {
-    pub statements: Vec<Stmt>,
+    pub declarations: Vec<Decl>,
 }
 
 #[derive(PartialEq, Debug)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Decl {
+    VarDecl { ident: Expr, expr: Expr },
+    Statement(Stmt),
 }
 
 #[derive(Debug, PartialEq)]
@@ -52,36 +58,46 @@ pub enum Expr {
 
 pub fn program(tokens: Vec<Token>) -> Result<Program, ParseError> {
     let mut token_iter = tokens.into_iter().peekable();
-    let mut statements: Vec<Stmt> = Vec::new();
+    let mut declarations: Vec<Decl> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
             // TODO: Sanity check for other tokens beyond EOF?
-            TokenType::EOF => return Ok(Program { statements }),
-            _ => statements.push(statement(&mut token_iter)?),
+            TokenType::EOF => return Ok(Program { declarations }),
+            _ => declarations.push(declaration(&mut token_iter)?),
         }
     }
     Err(ParseError::MissingEof)
 }
 
-pub fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
-    if let Some(next_token) = tokens.peek() {
-        let stmt = match next_token.type_ {
-            TokenType::PRINT => {
-                tokens.next(); // consume print token
-                Stmt::Print(expression(tokens)?)
-            }
-            _ => Stmt::Expression(expression(tokens)?),
-        };
-        match tokens.next_if(|tok| tok.type_ == TokenType::SEMICOLON) {
-            Some(_) => Ok(stmt),
-            _ => Err(ParseError::ExpectedToken {
-                stmt,
-                token_type: TokenType::SEMICOLON,
-            }),
+pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Decl, ParseError> {
+    let next_token = tokens.peek().expect("Unexpected EOF!");
+    let decl = match next_token.type_ {
+        TokenType::VAR => {
+            todo!();
+            // tokens.next(); // consume print token
+            // Stmt::Print(expression(tokens)?)
         }
-    } else {
-        panic!("Unexpected EOF!")
+        _ => Decl::Statement(statement(tokens)?),
+    };
+    match tokens.next_if(|tok| tok.type_ == TokenType::SEMICOLON) {
+        Some(_) => Ok(decl),
+        _ => Err(ParseError::ExpectedToken {
+            decl,
+            token_type: TokenType::SEMICOLON,
+        }),
     }
+}
+
+pub fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
+    let next_token = tokens.peek().expect("Unexpected EOF!");
+    let stmt = match next_token.type_ {
+        TokenType::PRINT => {
+            tokens.next(); // consume print token
+            Stmt::Print(expression(tokens)?)
+        }
+        _ => Stmt::Expression(expression(tokens)?),
+    };
+    Ok(stmt)
 }
 
 pub fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {

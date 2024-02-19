@@ -28,7 +28,7 @@ impl ErrorReport for parser::ParseError {
             }
             parser::ParseError::MissingEof => println!("Missing EOF Token!"),
             parser::ParseError::ExpectedToken {
-                stmt: _,
+                decl: _,
                 token_type,
             } => {
                 println!("Expected Token: {token_type:?}")

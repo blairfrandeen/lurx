@@ -1,5 +1,5 @@
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::parser::{Expr, Program, Stmt};
+use crate::compiler::parser::{Decl, Expr, Program, Stmt};
 
 use std::fmt::{Display, Formatter};
 
@@ -56,12 +56,21 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn run(&self, prgm: &Program) {
-        let mut stmts = prgm.statements.iter();
-        while let Some(stmt) = stmts.next() {
-            match stmt.execute() {
+        let mut decls = prgm.declarations.iter();
+        while let Some(decl) = decls.next() {
+            match decl.execute() {
                 Ok(()) => {}
                 Err(err) => println!("{err:?}"),
             }
+        }
+    }
+}
+
+impl Decl {
+    fn execute(&self) -> Result<(), RuntimeError> {
+        match &self {
+            Decl::Statement(stmt) => Ok(stmt.execute()?),
+            Decl::VarDecl { ident: _, expr: _ } => todo!(),
         }
     }
 }
@@ -77,6 +86,7 @@ impl Stmt {
         }
     }
 }
+
 impl LoxObject {
     fn is_number(&self) -> bool {
         match &self.value {
@@ -332,7 +342,8 @@ fn eval_literal(token: &Token) -> LoxObject {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::token_iter;
+    use crate::interpreter;
+    use crate::lexer::{self, token_iter};
     use crate::parser;
 
     #[test]
@@ -657,5 +668,15 @@ mod tests {
                 value: LoxValue::False
             })
         )
+    }
+
+    #[test]
+    fn test_hello_world() {
+        let source = "print \"hello world!\";".to_string();
+        let tokens = lexer::scan_source(&source).unwrap();
+        let program = parser::program(tokens).unwrap();
+        let interp = interpreter::Interpreter {};
+        interp.run(&program); // should not panic
+                              // TODO: Test standard output
     }
 }
