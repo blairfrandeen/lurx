@@ -23,6 +23,13 @@ impl Environment {
         let _ = &self.data.insert(Self::get_ident(&name), value);
     }
 
+    pub fn new() -> Self {
+        Environment {
+            data: HashMap::new(),
+            enclosing: None,
+        }
+    }
+
     fn get_ident(name: &Token) -> String {
         match name
             .literal

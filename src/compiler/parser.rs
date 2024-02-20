@@ -203,6 +203,7 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
             | (tok.type_ == TokenType::FALSE)
             | (tok.type_ == TokenType::TRUE)
             | (tok.type_ == TokenType::NIL)
+            | (tok.type_ == TokenType::IDENTIFIER)
     }) {
         Ok(Expr::Literal(next_token))
     } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::LEFT_PAREN) {

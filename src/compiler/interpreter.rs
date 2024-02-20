@@ -1,3 +1,4 @@
+use crate::compiler::environment::Environment;
 use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::parser::{Decl, Expr, Program, Stmt};
 
@@ -52,29 +53,33 @@ impl PartialOrd for LoxValue {
 }
 
 pub struct Interpreter {
-    // TODO
+    globals: Environment,
 }
 
 impl Interpreter {
-    pub fn run(&self, prgm: &Program) {
+    pub fn run(&mut self, prgm: &Program) {
         let mut decls = prgm.declarations.iter();
         while let Some(decl) = decls.next() {
-            match decl.execute() {
+            match &self.execute_decl(decl) {
                 Ok(()) => {}
                 Err(err) => println!("{err:?}"),
             }
         }
     }
-}
 
-impl Decl {
-    fn execute(&self) -> Result<(), RuntimeError> {
-        match &self {
+    pub fn new() -> Self {
+        Interpreter {
+            globals: Environment::new(),
+        }
+    }
+
+    fn execute_decl(&mut self, decl: &Decl) -> Result<(), RuntimeError> {
+        match decl {
             Decl::Statement(stmt) => Ok(stmt.execute()?),
-            Decl::VarDecl {
-                name: _,
-                initializer: _,
-            } => todo!(),
+            Decl::VarDecl { name, initializer } => {
+                self.globals.set(name, initializer.evaluate()?);
+                Ok(())
+            }
         }
     }
 }
@@ -679,7 +684,7 @@ mod tests {
         let source = "print \"hello world!\";".to_string();
         let tokens = lexer::scan_source(&source).unwrap();
         let program = parser::program(tokens).unwrap();
-        let interp = interpreter::Interpreter {};
+        let interp = interpreter::Interpreter::new();
         interp.run(&program); // should not panic
                               // TODO: Test standard output
     }

@@ -57,7 +57,7 @@ fn execute(source: &String) {
             return;
         }
     };
-    let interp = interpreter::Interpreter {};
+    let mut interp = interpreter::Interpreter::new();
     interp.run(&program);
 }
 use rustyline;
