@@ -51,6 +51,10 @@ impl ErrorReport for interpreter::RuntimeError {
             } => todo!(),
             interpreter::RuntimeError::InvalidOperand { operator, operand } => todo!(),
             interpreter::RuntimeError::NotImplemented => println!("Not implemented!"),
+            interpreter::RuntimeError::NameError(name) => {
+                println!("Undefined Name!");
+                show_error_token(&name, &source);
+            }
         }
     }
 }

@@ -19,12 +19,13 @@ pub enum RuntimeError {
         operator: Token,
         right: LoxObject,
     },
+    NameError(Token),
     NotImplemented,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct LoxObject {
-    value: LoxValue,
+    pub value: LoxValue,
 }
 
 #[derive(Debug, PartialEq, Clone)]
