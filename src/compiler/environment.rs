@@ -10,20 +10,27 @@ pub struct Environment {
 
 impl Environment {
     pub fn get(&self, name: &Token) -> Result<&LoxObject, RuntimeError> {
-        let ident = match name
+        match &self.data.get(&Self::get_ident(&name)) {
+            Some(obj) => Ok(*obj),
+            None => match &self.enclosing {
+                Some(enc) => enc.get(&name),
+                None => Err(RuntimeError::NameError(name.clone())),
+            },
+        }
+    }
+
+    pub fn set(&mut self, name: &Token, value: LoxObject) {
+        let _ = &self.data.insert(Self::get_ident(&name), value);
+    }
+
+    fn get_ident(name: &Token) -> String {
+        match name
             .literal
             .as_ref()
             .expect("Attempt to get name from invalid token type!")
         {
             Literal::Ident(id) => id.to_string(),
             _ => panic!("Attempt to get name from invalid token type!"),
-        };
-        match &self.data.get(&ident) {
-            Some(obj) => Ok(*obj),
-            None => match &self.enclosing {
-                Some(enc) => enc.get(&name),
-                None => Err(RuntimeError::NameError(name.clone())),
-            },
         }
     }
 }
@@ -81,5 +88,27 @@ mod tests {
         let local = env_fixture();
         let target = Token::identifier("q".to_string());
         assert_eq!(local.get(&target), Err(RuntimeError::NameError(target)));
+    }
+
+    #[test]
+    fn test_set() {
+        let mut local = env_fixture();
+        let c_value = LoxObject {
+            value: LoxValue::Number(3.0),
+        };
+        let c_token = Token::identifier("c".to_string());
+        local.set(&c_token, c_value.clone());
+        assert_eq!(local.get(&c_token), Ok(&c_value));
+    }
+
+    #[test]
+    fn test_scope() {
+        let mut local = env_fixture();
+        let a_value = LoxObject {
+            value: LoxValue::Number(3.0),
+        };
+        let a_token = Token::identifier("a".to_string());
+        local.set(&a_token, a_value.clone());
+        assert_eq!(local.get(&a_token), Ok(&a_value));
     }
 }
