@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use crate::compiler::interpreter::{LoxObject, RuntimeError};
+use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
+use crate::compiler::object::LoxObject;
 
 pub struct Environment {
     data: HashMap<String, LoxObject>,
@@ -45,7 +46,7 @@ impl Environment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::interpreter::LoxValue;
+    use crate::compiler::object::*;
 
     fn env_fixture() -> Environment {
         let var_a = LoxObject {
