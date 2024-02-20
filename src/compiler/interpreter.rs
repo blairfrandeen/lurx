@@ -46,109 +46,159 @@ impl Interpreter {
 
     fn execute_decl(&mut self, decl: &Decl) -> Result<(), RuntimeError> {
         match decl {
-            Decl::Statement(stmt) => Ok(stmt.execute()?),
+            Decl::Statement(stmt) => self.execute_statement(stmt),
             Decl::VarDecl { name, initializer } => {
-                self.globals.set(name, initializer.evaluate()?);
+                self.globals.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
         }
     }
-}
 
-impl Stmt {
-    fn execute(&self) -> Result<(), RuntimeError> {
-        match &self {
+    fn execute_statement(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match &stmt {
             Stmt::Print(expr) => {
-                println!("{}", expr.evaluate()?);
+                println!("{}", self.evaluate(expr)?);
                 Ok(())
             }
             Stmt::Expression(_) => Ok(()),
         }
     }
-}
 
-pub trait Evaluate {
-    fn evaluate(&self) -> Result<LoxObject, RuntimeError>;
-}
+    fn evaluate(&self, expr: &Expr) -> Result<LoxObject, RuntimeError> {
+        match &expr {
+            Expr::Unary { operator, right } => self.eval_unary(operator, right),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => self.eval_binary(left, operator, right),
+            Expr::Grouping(expr) => self.eval_grouping(expr),
+            Expr::Literal(token) => Ok(self.eval_literal(token)),
+        }
+    }
 
-fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
-    let right = right.evaluate()?;
-    let left = left.evaluate()?;
+    fn eval_binary(
+        &self,
+        left: &Expr,
+        operator: &Token,
+        right: &Expr,
+    ) -> Result<LoxObject, RuntimeError> {
+        let right = self.evaluate(right)?;
+        let left = self.evaluate(left)?;
 
-    let value = match operator.type_ {
-        TokenType::SLASH => {
-            let right_value = right.number();
-            let left_value = left.number();
-            if left_value.is_some() & (right_value == Some(0.0)) {
-                return Err(RuntimeError::ZeroDivision {
-                    left,
-                    operator: operator.clone(),
-                    right,
-                });
-            } else if right_value.is_none() | left_value.is_none() {
-                return Err(RuntimeError::TypeError {
-                    left,
-                    operator: operator.clone(),
-                    right,
-                });
-            } else {
-                LoxValue::Number(left_value.unwrap() / right_value.unwrap())
+        let value = match operator.type_ {
+            TokenType::SLASH => {
+                let right_value = right.number();
+                let left_value = left.number();
+                if left_value.is_some() & (right_value == Some(0.0)) {
+                    return Err(RuntimeError::ZeroDivision {
+                        left,
+                        operator: operator.clone(),
+                        right,
+                    });
+                } else if right_value.is_none() | left_value.is_none() {
+                    return Err(RuntimeError::TypeError {
+                        left,
+                        operator: operator.clone(),
+                        right,
+                    });
+                } else {
+                    LoxValue::Number(left_value.unwrap() / right_value.unwrap())
+                }
             }
-        }
-        TokenType::STAR => {
-            let right_value = right.number();
-            let left_value = left.number();
-            if right_value.is_none() | left_value.is_none() {
-                return Err(RuntimeError::TypeError {
-                    left,
-                    operator: operator.clone(),
-                    right,
-                });
-            } else {
-                LoxValue::Number(right_value.unwrap() * left_value.unwrap())
+            TokenType::STAR => {
+                let right_value = right.number();
+                let left_value = left.number();
+                if right_value.is_none() | left_value.is_none() {
+                    return Err(RuntimeError::TypeError {
+                        left,
+                        operator: operator.clone(),
+                        right,
+                    });
+                } else {
+                    LoxValue::Number(right_value.unwrap() * left_value.unwrap())
+                }
             }
-        }
-        TokenType::MINUS => {
-            let right_value = right.number();
-            let left_value = left.number();
-            if right_value.is_none() | left_value.is_none() {
-                return Err(RuntimeError::TypeError {
-                    left,
-                    operator: operator.clone(),
-                    right,
-                });
-            } else {
-                LoxValue::Number(right_value.unwrap() - left_value.unwrap())
+            TokenType::MINUS => {
+                let right_value = right.number();
+                let left_value = left.number();
+                if right_value.is_none() | left_value.is_none() {
+                    return Err(RuntimeError::TypeError {
+                        left,
+                        operator: operator.clone(),
+                        right,
+                    });
+                } else {
+                    LoxValue::Number(right_value.unwrap() - left_value.unwrap())
+                }
             }
-        }
-        TokenType::PLUS => {
-            if right.is_str() & left.is_str() {
-                LoxValue::StrLit(format!(
-                    "{}{}",
-                    left.strlit().unwrap(),
-                    right.strlit().unwrap()
-                ))
-            } else if right.is_number() & left.is_number() {
-                let right_value = right.number().unwrap();
-                let left_value = left.number().unwrap();
-                LoxValue::Number(left_value + right_value)
-            } else {
-                return Err(RuntimeError::TypeError {
-                    left,
-                    operator: operator.clone(),
-                    right,
-                });
+            TokenType::PLUS => {
+                if right.is_str() & left.is_str() {
+                    LoxValue::StrLit(format!(
+                        "{}{}",
+                        left.strlit().unwrap(),
+                        right.strlit().unwrap()
+                    ))
+                } else if right.is_number() & left.is_number() {
+                    let right_value = right.number().unwrap();
+                    let left_value = left.number().unwrap();
+                    LoxValue::Number(left_value + right_value)
+                } else {
+                    return Err(RuntimeError::TypeError {
+                        left,
+                        operator: operator.clone(),
+                        right,
+                    });
+                }
             }
+            TokenType::GREATER => compare_lox_value(&left, &operator, &right)?,
+            TokenType::GREATER_EQUAL => compare_lox_value(&left, &operator, &right)?,
+            TokenType::LESS => compare_lox_value(&left, &operator, &right)?,
+            TokenType::LESS_EQUAL => compare_lox_value(&left, &operator, &right)?,
+            TokenType::EQUAL_EQUAL => compare_lox_value(&left, &operator, &right)?,
+            TokenType::BANG_EQUAL => compare_lox_value(&left, &operator, &right)?,
+            _ => return Err(RuntimeError::NotImplemented),
+        };
+        Ok(LoxObject { value })
+    }
+
+    fn eval_grouping(&self, expr: &Expr) -> Result<LoxObject, RuntimeError> {
+        self.evaluate(expr)
+    }
+
+    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
+        let mut right = self.evaluate(right)?;
+        right.value = match operator.type_ {
+            TokenType::BANG => match right.value {
+                LoxValue::True => LoxValue::False,
+                LoxValue::False => LoxValue::True,
+                LoxValue::Nil => LoxValue::True,
+                _ => {
+                    return Err(RuntimeError::InvalidOperand {
+                        operator: operator.clone(),
+                        operand: right,
+                    })
+                }
+            },
+            TokenType::MINUS => match right.value {
+                LoxValue::Number(n) => LoxValue::Number(-n),
+                _ => {
+                    return Err(RuntimeError::InvalidOperand {
+                        operator: operator.clone(),
+                        operand: right,
+                    })
+                }
+            },
+            _ => panic!("Invalid operator in Unary!"),
+        };
+        Ok(right)
+    }
+
+    fn eval_literal(&self, token: &Token) -> LoxObject {
+        LoxObject {
+            value: token.value(),
         }
-        TokenType::GREATER => compare_lox_value(&left, &operator, &right)?,
-        TokenType::GREATER_EQUAL => compare_lox_value(&left, &operator, &right)?,
-        TokenType::LESS => compare_lox_value(&left, &operator, &right)?,
-        TokenType::LESS_EQUAL => compare_lox_value(&left, &operator, &right)?,
-        TokenType::EQUAL_EQUAL => compare_lox_value(&left, &operator, &right)?,
-        TokenType::BANG_EQUAL => compare_lox_value(&left, &operator, &right)?,
-        _ => return Err(RuntimeError::NotImplemented),
-    };
-    Ok(LoxObject { value })
+    }
 }
 
 fn compare_lox_value(
@@ -192,53 +242,6 @@ fn compare_lox_value(
     }
 }
 
-impl Evaluate for Expr {
-    fn evaluate(&self) -> Result<LoxObject, RuntimeError> {
-        match &self {
-            Expr::Unary { operator, right } => eval_unary(operator, right),
-            Expr::Binary {
-                left,
-                operator,
-                right,
-            } => eval_binary(left, operator, right),
-            Expr::Grouping(expr) => eval_grouping(expr),
-            Expr::Literal(token) => Ok(eval_literal(token)),
-        }
-    }
-}
-
-fn eval_grouping(expr: &Expr) -> Result<LoxObject, RuntimeError> {
-    expr.evaluate()
-}
-
-fn eval_unary(operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
-    let mut right = right.evaluate()?;
-    right.value = match operator.type_ {
-        TokenType::BANG => match right.value {
-            LoxValue::True => LoxValue::False,
-            LoxValue::False => LoxValue::True,
-            LoxValue::Nil => LoxValue::True,
-            _ => {
-                return Err(RuntimeError::InvalidOperand {
-                    operator: operator.clone(),
-                    operand: right,
-                })
-            }
-        },
-        TokenType::MINUS => match right.value {
-            LoxValue::Number(n) => LoxValue::Number(-n),
-            _ => {
-                return Err(RuntimeError::InvalidOperand {
-                    operator: operator.clone(),
-                    operand: right,
-                })
-            }
-        },
-        _ => panic!("Invalid operator in Unary!"),
-    };
-    Ok(right)
-}
-
 impl Token {
     /// Get the LoxValue associated with a token, if any.
     /// Panic if invalid token chosen
@@ -260,12 +263,9 @@ impl Token {
     }
 }
 
-fn eval_literal(token: &Token) -> LoxObject {
-    LoxObject {
-        value: token.value(),
-    }
-}
+impl Stmt {}
 
+#[allow(unused_mut)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,28 +277,32 @@ mod tests {
     fn test_eval_unary_not_true() {
         let mut token_iter = token_iter("!true");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate().unwrap();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un).unwrap();
         assert_eq!(eval.value, LoxValue::False);
     }
     #[test]
     fn test_eval_unary_not_false() {
         let mut token_iter = token_iter("!false");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate().unwrap();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un).unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_not_nil() {
         let mut token_iter = token_iter("!nil");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate().unwrap();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un).unwrap();
         assert_eq!(eval.value, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_minus() {
         let mut token_iter = token_iter("---2");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate().unwrap();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un).unwrap();
         assert_eq!(eval.value, LoxValue::Number(-2.0));
     }
 
@@ -306,7 +310,8 @@ mod tests {
     fn test_eval_unary_not_invalid() {
         let mut token_iter = token_iter("!2");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un);
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
@@ -322,7 +327,8 @@ mod tests {
     fn test_eval_unary_minus_invalid() {
         let mut token_iter = token_iter("-true");
         let un = parser::expression(&mut token_iter).unwrap();
-        let eval = un.evaluate();
+        let mut interp = Interpreter::new();
+        let eval = interp.evaluate(&un);
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
@@ -337,7 +343,9 @@ mod tests {
     #[test]
     fn test_zero_div_error() {
         let mut token_iter = token_iter("1/0");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::ZeroDivision {
@@ -355,7 +363,9 @@ mod tests {
     #[test]
     fn test_type_before_zero_div_error() {
         let mut token_iter = token_iter("\"anything\"/0");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -373,7 +383,9 @@ mod tests {
     #[test]
     fn test_mult() {
         let mut token_iter = token_iter("7*7");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -385,7 +397,9 @@ mod tests {
     #[test]
     fn test_div() {
         let mut token_iter = token_iter("-49/-7");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -397,7 +411,9 @@ mod tests {
     #[test]
     fn test_factor_type_err() {
         let mut token_iter_ = token_iter("-49/\"seven\"");
-        let result = parser::expression(&mut token_iter_).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter_).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -410,8 +426,9 @@ mod tests {
                 },
             })
         );
-        let mut token_iter = token_iter("true * nil");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut token_iter_ = token_iter("true * nil");
+        let expr = parser::expression(&mut token_iter_).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -429,7 +446,9 @@ mod tests {
     #[test]
     fn test_term_type_err() {
         let mut token_iter = token_iter("-49+true");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -446,7 +465,9 @@ mod tests {
     #[test]
     fn test_term_addition() {
         let mut token_iter = token_iter("5*8/4 + 8/2");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -457,7 +478,9 @@ mod tests {
     #[test]
     fn test_string_concat() {
         let mut token_iter = token_iter("\"Hello \" + \"World!\"");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -469,7 +492,9 @@ mod tests {
     #[test]
     fn test_string_sub_error() {
         let mut token_iter = token_iter("\"Hello \" - \"World!\"");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -487,7 +512,9 @@ mod tests {
     #[test]
     fn test_cmp() {
         let mut token_iter = token_iter("3>2");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -499,7 +526,9 @@ mod tests {
     #[test]
     fn test_cmp_err() {
         let mut token_iter = token_iter("3>true");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -516,7 +545,9 @@ mod tests {
     #[test]
     fn test_eq() {
         let mut token_iter = token_iter("(2+2)==5");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -528,7 +559,9 @@ mod tests {
     #[test]
     fn test_str_eq() {
         let mut token_iter = token_iter("\"hello\"==\"hello\"");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -540,7 +573,9 @@ mod tests {
     #[test]
     fn test_str_not_eq() {
         let mut token_iter = token_iter("\"parrot\"!=\"alive\"");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
@@ -552,7 +587,9 @@ mod tests {
     #[test]
     fn test_str_num_cmp() {
         let mut token_iter = token_iter("\"parrot\"!=33");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -570,7 +607,9 @@ mod tests {
     #[test]
     fn test_str_gt_cmp() {
         let mut token_iter = token_iter("\"coffee\"<=\"tea\"");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -588,7 +627,9 @@ mod tests {
     #[test]
     fn test_cmp_bool() {
         let mut token_iter = token_iter("true==false");
-        let result = parser::expression(&mut token_iter).unwrap().evaluate();
+        let mut interp = Interpreter::new();
+        let expr = parser::expression(&mut token_iter).unwrap();
+        let result = interp.evaluate(&expr);
         assert_eq!(
             result,
             Ok(LoxObject {
