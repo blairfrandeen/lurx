@@ -27,11 +27,9 @@ impl ErrorReport for parser::ParseError {
                 println!("ParseError: Not Implemented ({token})")
             }
             parser::ParseError::MissingEof => println!("Missing EOF Token!"),
-            parser::ParseError::ExpectedToken {
-                decl: _,
-                token_type,
-            } => {
-                println!("Expected Token: {token_type:?}")
+            parser::ParseError::ExpectedToken { expected, found } => {
+                println!("Expected Token: {expected:?}");
+                show_error_token(found, &source);
             }
         }
     }

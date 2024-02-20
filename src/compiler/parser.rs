@@ -7,7 +7,7 @@ pub enum ParseError {
     UnclosedParenthesis(Token),
     UnexpectedToken(Token),
     NotImplemented(Token),
-    ExpectedToken { decl: Decl, token_type: TokenType },
+    ExpectedToken { expected: TokenType, found: Token },
     MissingEof,
 }
 
@@ -37,7 +37,7 @@ pub enum Stmt {
 
 #[derive(Debug, PartialEq)]
 pub enum Decl {
-    VarDecl { ident: Expr, expr: Expr },
+    VarDecl { name: Token, initializer: Expr },
     Statement(Stmt),
 }
 
@@ -73,18 +73,32 @@ pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
     let next_token = tokens.peek().expect("Unexpected EOF!");
     let decl = match next_token.type_ {
         TokenType::VAR => {
-            todo!();
-            // tokens.next(); // consume print token
-            // Stmt::Print(expression(tokens)?)
+            tokens.next(); // consume var token
+            let name = match_token(tokens, TokenType::IDENTIFIER)?;
+            match_token(tokens, TokenType::EQUAL)?;
+            let initializer = expression(tokens)?;
+            Decl::VarDecl { name, initializer }
         }
         _ => Decl::Statement(statement(tokens)?),
     };
-    match tokens.next_if(|tok| tok.type_ == TokenType::SEMICOLON) {
-        Some(_) => Ok(decl),
-        _ => Err(ParseError::ExpectedToken {
-            decl,
-            token_type: TokenType::SEMICOLON,
-        }),
+    match_token(tokens, TokenType::SEMICOLON)?;
+    Ok(decl)
+}
+
+/// Ensure the next token in a token iterator is of the expected type
+/// Return that token if successful
+fn match_token(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    expected: TokenType,
+) -> Result<Token, ParseError> {
+    let next_token = tokens.next().expect("Unexpected EOF!");
+    if next_token.type_ == expected {
+        Ok(next_token)
+    } else {
+        Err(ParseError::ExpectedToken {
+            expected,
+            found: next_token,
+        })
     }
 }
 
@@ -399,5 +413,41 @@ mod tests {
         let expr_source = String::from("();");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert!(program(expr_tokens).is_ok());
+    }
+
+    #[test]
+    fn test_var_decl() {
+        let mut token_iter = token_iter("var a = 7;");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Decl::VarDecl {
+                name: Token::identifier("a".to_string()),
+                initializer: Expr::Literal(Token::numlit(7.0))
+            })
+        );
+    }
+
+    #[test]
+    fn test_var_decl_missing_eq() {
+        let mut token_iter = token_iter("var a 7;");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Err(ParseError::ExpectedToken {
+                expected: TokenType::EQUAL,
+                found: Token::numlit(7.0),
+            })
+        )
+    }
+
+    #[test]
+    fn test_var_decl_missing_ident() {
+        let mut token_iter = token_iter("var = 7;");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Err(ParseError::ExpectedToken {
+                expected: TokenType::IDENTIFIER,
+                found: Token::from_type(TokenType::EQUAL),
+            })
+        )
     }
 }

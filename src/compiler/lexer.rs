@@ -114,7 +114,7 @@ impl Token {
     pub fn identifier(literal: String) -> Self {
         Token {
             type_: TokenType::IDENTIFIER,
-            literal: Some(Literal::StringLit(literal)),
+            literal: Some(Literal::Ident(literal)),
             ..Default::default()
         }
     }

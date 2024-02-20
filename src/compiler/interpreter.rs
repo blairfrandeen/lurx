@@ -70,7 +70,10 @@ impl Decl {
     fn execute(&self) -> Result<(), RuntimeError> {
         match &self {
             Decl::Statement(stmt) => Ok(stmt.execute()?),
-            Decl::VarDecl { ident: _, expr: _ } => todo!(),
+            Decl::VarDecl {
+                name: _,
+                initializer: _,
+            } => todo!(),
         }
     }
 }
