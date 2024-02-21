@@ -73,7 +73,7 @@ impl Interpreter {
                 right,
             } => self.eval_binary(left, operator, right),
             Expr::Grouping(expr) => self.eval_grouping(expr),
-            Expr::Literal(token) => Ok(self.eval_literal(token)),
+            Expr::Literal(token) => self.eval_literal(token),
         }
     }
 
@@ -194,9 +194,12 @@ impl Interpreter {
         Ok(right)
     }
 
-    fn eval_literal(&self, token: &Token) -> LoxObject {
-        LoxObject {
-            value: token.value(),
+    fn eval_literal(&self, token: &Token) -> Result<LoxObject, RuntimeError> {
+        match &token.type_ {
+            TokenType::IDENTIFIER => self.globals.get(&token).cloned(),
+            _ => Ok(LoxObject {
+                value: token.value(),
+            }),
         }
     }
 }
@@ -262,8 +265,6 @@ impl Token {
         }
     }
 }
-
-impl Stmt {}
 
 #[allow(unused_mut)]
 #[cfg(test)]

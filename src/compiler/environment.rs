@@ -4,6 +4,7 @@ use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
 use crate::compiler::object::LoxObject;
 
+#[derive(Debug)]
 pub struct Environment {
     data: HashMap<String, LoxObject>,
     enclosing: Option<Box<Environment>>,
