@@ -23,27 +23,21 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let source: String;
+    let mut interp = interpreter::Interpreter::new();
     if let Some(source_file) = args.source_path {
         source = fs::read_to_string(source_file).unwrap();
-        execute(&source);
+        execute(&source, &mut interp);
     } else if let Some(source_code) = args.code {
         source = source_code;
-        execute(&source);
+        execute(&source, &mut interp);
     } else {
         let _ = repl();
-        // Args::command().print_help().unwrap();
-        // std::process::exit(1);
     }
 }
 
-fn execute(source: &String) {
+fn execute(source: &String, interp: &mut interpreter::Interpreter) {
     let tokens = match lexer::scan_source(&source) {
-        Ok(ref toks) => {
-            // for token in toks.iter() {
-            //     println!("{token:?}");
-            // }
-            toks.clone()
-        }
+        Ok(ref toks) => toks.clone(),
         Err(ref scan_err) => {
             scan_err.report(&source);
             return;
@@ -57,11 +51,11 @@ fn execute(source: &String) {
             return;
         }
     };
-    let mut interp = interpreter::Interpreter::new();
     interp.run(&program);
 }
 use rustyline;
 fn repl() -> rustyline::Result<()> {
+    let mut interp = interpreter::Interpreter::new();
     let mut rl = rustyline::DefaultEditor::new()?;
     loop {
         let readline = rl.readline(">> ");
@@ -70,7 +64,7 @@ fn repl() -> rustyline::Result<()> {
                 if line == "quit".to_string() {
                     break;
                 } else {
-                    execute(&line)
+                    execute(&line, &mut interp)
                 }
             }
             Err(err) => match err {
