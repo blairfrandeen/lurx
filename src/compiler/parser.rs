@@ -27,6 +27,7 @@ impl Expr {
 #[derive(PartialEq, Debug)]
 pub struct Program {
     pub declarations: Vec<Decl>,
+    pub errors: Vec<ParseError>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -56,17 +57,48 @@ pub enum Expr {
     Grouping(Box<Expr>),
 }
 
-pub fn program(tokens: Vec<Token>) -> Result<Program, ParseError> {
+pub fn program(tokens: Vec<Token>) -> Program {
     let mut token_iter = tokens.into_iter().peekable();
     let mut declarations: Vec<Decl> = Vec::new();
+    let mut errors: Vec<ParseError> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
             // TODO: Sanity check for other tokens beyond EOF?
-            TokenType::EOF => return Ok(Program { declarations }),
-            _ => declarations.push(declaration(&mut token_iter)?),
+            TokenType::EOF => break,
+            _ => match declaration(&mut token_iter) {
+                Ok(decl) => declarations.push(decl),
+                Err(err) => {
+                    errors.push(err);
+                    synchronize(&mut token_iter);
+                }
+            },
         }
     }
-    Err(ParseError::MissingEof)
+    Program {
+        declarations,
+        errors,
+    }
+}
+
+fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
+    while let Some(current_token) = tokens.next() {
+        if current_token.type_ == TokenType::SEMICOLON {
+            return;
+        }
+        if let Some(next_token) = tokens.peek() {
+            match next_token.type_ {
+                TokenType::CLASS => return,
+                TokenType::FUN => return,
+                TokenType::VAR => return,
+                TokenType::FOR => return,
+                TokenType::IF => return,
+                TokenType::WHILE => return,
+                TokenType::PRINT => return,
+                TokenType::RETURN => return,
+                _ => continue,
+            }
+        }
+    }
 }
 
 pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Decl, ParseError> {
@@ -387,11 +419,11 @@ mod tests {
         let expr_source = String::from("((1+((2))/3)");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            program(expr_tokens),
-            Err(ParseError::UnclosedParenthesis(Token {
+            program(expr_tokens).errors[0],
+            ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::LEFT_PAREN,
                 ..Default::default()
-            }))
+            })
         )
     }
     #[test]
@@ -400,11 +432,11 @@ mod tests {
         let expr_source = String::from("((1+2))/3)))");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            program(expr_tokens),
-            Err(ParseError::UnclosedParenthesis(Token {
+            program(expr_tokens).errors[0],
+            ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::RIGHT_PAREN,
                 ..Default::default()
-            }))
+            })
         )
     }
 
@@ -413,7 +445,7 @@ mod tests {
     fn test_unmatched_closing_paren() {
         let expr_source = String::from("();");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        assert!(program(expr_tokens).is_ok());
+        assert!(program(expr_tokens).errors.is_empty());
     }
 
     #[test]
@@ -450,5 +482,14 @@ mod tests {
                 found: Token::from_type(TokenType::EQUAL),
             })
         )
+    }
+
+    #[test]
+    fn test_multiple_errors() {
+        let mult_err =
+            std::fs::read_to_string("tests/multiple_error.lox").expect("file should exist");
+        let tokens = crate::compiler::lexer::scan_source(&mult_err).unwrap();
+        let prgm = program(tokens);
+        assert_eq!(prgm.errors.len(), 2);
     }
 }

@@ -643,7 +643,7 @@ mod tests {
     fn test_hello_world() {
         let source = "print \"hello world!\";".to_string();
         let tokens = lexer::scan_source(&source).unwrap();
-        let program = parser::program(tokens).unwrap();
+        let program = parser::program(tokens);
         let mut interp = interpreter::Interpreter::new();
         interp.run(&program); // should not panic
                               // TODO: Test standard output

@@ -44,14 +44,14 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter) {
         }
     };
 
-    let program = match parser::program(tokens) {
-        Ok(tree) => tree,
-        Err(parse_err) => {
-            parse_err.report(&source);
-            return;
+    let program = parser::program(tokens);
+    if program.errors.is_empty() {
+        interp.run(&program);
+    } else {
+        for error in program.errors.iter() {
+            error.report(&source);
         }
-    };
-    interp.run(&program);
+    }
 }
 use rustyline;
 fn repl() -> rustyline::Result<()> {

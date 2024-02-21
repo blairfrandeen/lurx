@@ -1,0 +1,6 @@
+var a 7+21/8; // parse error: missing equals sign
+print 7; // should work
+print 8 // missing semicolon
+print 8; // should work
+print ((7)-21/9 >= 4; // unclosed parenthesis!
+var a = 7; // should work
