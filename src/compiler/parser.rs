@@ -81,21 +81,29 @@ pub fn program(tokens: Vec<Token>) -> Program {
 }
 
 fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
-    while let Some(current_token) = tokens.next() {
-        if current_token.type_ == TokenType::SEMICOLON {
-            return;
-        }
-        if let Some(next_token) = tokens.peek() {
-            match next_token.type_ {
-                TokenType::CLASS => return,
-                TokenType::FUN => return,
-                TokenType::VAR => return,
-                TokenType::FOR => return,
-                TokenType::IF => return,
-                TokenType::WHILE => return,
-                TokenType::PRINT => return,
-                TokenType::RETURN => return,
-                _ => continue,
+    while let Some(current_token) = tokens.peek() {
+        match current_token.type_ {
+            // if we get to a semicolon, we suspect we're at a statement boundary, so we consume it
+            // and move on
+            TokenType::SEMICOLON => {
+                tokens.next();
+                return;
+            }
+            // If we get to a token that typically starts a statement, we presume that a semicolon
+            // was missing and we return without consuming the token so we can start a new
+            // statement.
+            TokenType::CLASS => return,
+            TokenType::FUN => return,
+            TokenType::VAR => return,
+            TokenType::FOR => return,
+            TokenType::IF => return,
+            TokenType::WHILE => return,
+            TokenType::PRINT => return,
+            TokenType::RETURN => return,
+            _ => {
+                // anything else, consume the token and keep trying to find a statement boundary.
+                tokens.next();
+                continue;
             }
         }
     }
@@ -113,8 +121,17 @@ pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
         }
         _ => Decl::Statement(statement(tokens)?),
     };
-    match_token(tokens, TokenType::SEMICOLON)?;
-    Ok(decl)
+    let lookahead = tokens.peek().expect("Unexpected EOF!");
+    match lookahead.type_ {
+        TokenType::SEMICOLON => {
+            tokens.next();
+            Ok(decl)
+        }
+        _ => Err(ParseError::ExpectedToken {
+            expected: TokenType::SEMICOLON,
+            found: lookahead.clone(),
+        }),
+    }
 }
 
 /// Ensure the next token in a token iterator is of the expected type
@@ -489,7 +506,18 @@ mod tests {
         let mult_err =
             std::fs::read_to_string("tests/multiple_error.lox").expect("file should exist");
         let tokens = crate::compiler::lexer::scan_source(&mult_err).unwrap();
+        dbg!(&tokens);
         let prgm = program(tokens);
-        assert_eq!(prgm.errors.len(), 2);
+        assert_eq!(prgm.errors.len(), 3);
+        assert_eq!(prgm.declarations.len(), 3);
+    }
+
+    #[test]
+    fn test_sync() {
+        let sync_prgm = "print 1 print 2;".to_string();
+        let tokens = crate::compiler::lexer::scan_source(&sync_prgm).unwrap();
+        let prgm = program(tokens);
+        assert_eq!(prgm.errors.len(), 1);
+        assert_eq!(prgm.declarations.len(), 1);
     }
 }
