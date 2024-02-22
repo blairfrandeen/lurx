@@ -279,6 +279,7 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                     while let Some((_, next_char)) = chars
                         .next_if(|(_, c)| c.is_ascii_alphabetic() | c.is_digit(10) | (*c == '_'))
                     {
+                        loc_end += 1;
                         lexeme.push(next_char);
                     }
 

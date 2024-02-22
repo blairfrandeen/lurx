@@ -44,7 +44,7 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter) {
         }
     };
 
-    let program = parser::program(tokens);
+    let program = parser::program(tokens, source.clone());
     if program.errors.is_empty() {
         interp.run(&program);
     } else {

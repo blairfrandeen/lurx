@@ -1,4 +1,5 @@
 use crate::compiler::environment::Environment;
+use crate::compiler::errors::ErrorReport;
 use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::object::{LoxObject, LoxValue};
 use crate::compiler::parser::{Expr, Program, Stmt};
@@ -33,7 +34,7 @@ impl Interpreter {
         while let Some(stmt) = decls.next() {
             match &self.execute_stmt(stmt) {
                 Ok(()) => {}
-                Err(err) => println!("{err:?}"),
+                Err(err) => err.report(&prgm.source),
             }
         }
     }
@@ -645,7 +646,7 @@ mod tests {
     fn test_hello_world() {
         let source = "print \"hello world!\";".to_string();
         let tokens = lexer::scan_source(&source).unwrap();
-        let program = parser::program(tokens);
+        let program = parser::program(tokens, source);
         let mut interp = interpreter::Interpreter::new();
         interp.run(&program); // should not panic
                               // TODO: Test standard output

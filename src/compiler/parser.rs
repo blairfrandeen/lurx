@@ -28,6 +28,7 @@ impl Expr {
 pub struct Program {
     pub statements: Vec<Stmt>,
     pub errors: Vec<ParseError>,
+    pub source: String,
 }
 
 #[derive(PartialEq, Debug)]
@@ -57,7 +58,7 @@ pub enum Expr {
     },
 }
 
-pub fn program(tokens: Vec<Token>) -> Program {
+pub fn program(tokens: Vec<Token>, source: String) -> Program {
     let mut token_iter = tokens.into_iter().peekable();
     let mut statements: Vec<Stmt> = Vec::new();
     let mut errors: Vec<ParseError> = Vec::new();
@@ -74,7 +75,11 @@ pub fn program(tokens: Vec<Token>) -> Program {
             },
         }
     }
-    Program { statements, errors }
+    Program {
+        statements,
+        errors,
+        source,
+    }
 }
 
 fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
@@ -465,7 +470,7 @@ mod tests {
         let expr_source = String::from("((1+((2))/3)");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            program(expr_tokens).errors[0],
+            program(expr_tokens, expr_source).errors[0],
             ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::LEFT_PAREN,
                 ..Default::default()
@@ -478,7 +483,7 @@ mod tests {
         let expr_source = String::from("((1+2))/3)))");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
         assert_eq!(
-            program(expr_tokens).errors[0],
+            program(expr_tokens, expr_source).errors[0],
             ParseError::UnclosedParenthesis(Token {
                 type_: TokenType::RIGHT_PAREN,
                 ..Default::default()
@@ -491,7 +496,7 @@ mod tests {
     fn test_unmatched_closing_paren() {
         let expr_source = String::from("();");
         let expr_tokens = crate::lexer::scan_source(&expr_source).unwrap();
-        assert!(program(expr_tokens).errors.is_empty());
+        assert!(program(expr_tokens, expr_source).errors.is_empty());
     }
 
     #[test]
@@ -536,7 +541,7 @@ mod tests {
             std::fs::read_to_string("tests/multiple_error.lox").expect("file should exist");
         let tokens = crate::compiler::lexer::scan_source(&mult_err).unwrap();
         dbg!(&tokens);
-        let prgm = program(tokens);
+        let prgm = program(tokens, mult_err);
         assert_eq!(prgm.errors.len(), 3);
         assert_eq!(prgm.statements.len(), 3);
     }
@@ -545,7 +550,7 @@ mod tests {
     fn test_sync() {
         let sync_prgm = "print 1 print 2;".to_string();
         let tokens = crate::compiler::lexer::scan_source(&sync_prgm).unwrap();
-        let prgm = program(tokens);
+        let prgm = program(tokens, sync_prgm);
         assert_eq!(prgm.errors.len(), 1);
         assert_eq!(prgm.statements.len(), 1);
     }

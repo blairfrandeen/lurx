@@ -52,7 +52,15 @@ impl ErrorReport for interpreter::RuntimeError {
             interpreter::RuntimeError::InvalidOperand { operator, operand } => todo!(),
             interpreter::RuntimeError::NotImplemented => println!("Not implemented!"),
             interpreter::RuntimeError::NameError(name) => {
-                println!("Undefined Name!");
+                let ident = match name.literal.as_ref().unwrap() {
+                    lexer::Literal::Ident(s) => s,
+                    _ => panic!(),
+                };
+                println!(
+                    "Undefined Name, line {}: '{}'",
+                    name.line_num(&source),
+                    ident
+                );
                 show_error_token(&name, &source);
             }
         }
