@@ -26,7 +26,7 @@ impl Expr {
 
 #[derive(PartialEq, Debug)]
 pub struct Program {
-    pub declarations: Vec<Decl>,
+    pub statements: Vec<Stmt>,
     pub errors: Vec<ParseError>,
 }
 
@@ -34,12 +34,7 @@ pub struct Program {
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Decl {
     VarDecl { name: Token, initializer: Expr },
-    Statement(Stmt),
 }
 
 #[derive(Debug, PartialEq)]
@@ -59,14 +54,14 @@ pub enum Expr {
 
 pub fn program(tokens: Vec<Token>) -> Program {
     let mut token_iter = tokens.into_iter().peekable();
-    let mut declarations: Vec<Decl> = Vec::new();
+    let mut statements: Vec<Stmt> = Vec::new();
     let mut errors: Vec<ParseError> = Vec::new();
     while let Some(next_tok) = token_iter.peek() {
         match next_tok.type_ {
             // TODO: Sanity check for other tokens beyond EOF?
             TokenType::EOF => break,
             _ => match declaration(&mut token_iter) {
-                Ok(decl) => declarations.push(decl),
+                Ok(stmt) => statements.push(stmt),
                 Err(err) => {
                     errors.push(err);
                     synchronize(&mut token_iter);
@@ -74,10 +69,7 @@ pub fn program(tokens: Vec<Token>) -> Program {
             },
         }
     }
-    Program {
-        declarations,
-        errors,
-    }
+    Program { statements, errors }
 }
 
 fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
@@ -109,7 +101,7 @@ fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
     }
 }
 
-pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Decl, ParseError> {
+pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
     let next_token = tokens.peek().expect("Unexpected EOF!");
     let decl = match next_token.type_ {
         TokenType::VAR => {
@@ -117,9 +109,9 @@ pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
             let name = match_token(tokens, TokenType::IDENTIFIER)?;
             match_token(tokens, TokenType::EQUAL)?;
             let initializer = expression(tokens)?;
-            Decl::VarDecl { name, initializer }
+            Stmt::VarDecl { name, initializer }
         }
-        _ => Decl::Statement(statement(tokens)?),
+        _ => statement(tokens)?,
     };
     let lookahead = tokens.peek().expect("Unexpected EOF!");
     match lookahead.type_ {
@@ -470,7 +462,7 @@ mod tests {
         let mut token_iter = token_iter("var a = 7;");
         assert_eq!(
             declaration(&mut token_iter),
-            Ok(Decl::VarDecl {
+            Ok(Stmt::VarDecl {
                 name: Token::identifier("a".to_string()),
                 initializer: Expr::Literal(Token::numlit(7.0))
             })
@@ -509,7 +501,7 @@ mod tests {
         dbg!(&tokens);
         let prgm = program(tokens);
         assert_eq!(prgm.errors.len(), 3);
-        assert_eq!(prgm.declarations.len(), 3);
+        assert_eq!(prgm.statements.len(), 3);
     }
 
     #[test]
@@ -518,6 +510,6 @@ mod tests {
         let tokens = crate::compiler::lexer::scan_source(&sync_prgm).unwrap();
         let prgm = program(tokens);
         assert_eq!(prgm.errors.len(), 1);
-        assert_eq!(prgm.declarations.len(), 1);
+        assert_eq!(prgm.statements.len(), 1);
     }
 }

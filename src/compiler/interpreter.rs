@@ -1,7 +1,7 @@
 use crate::compiler::environment::Environment;
 use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::object::{LoxObject, LoxValue};
-use crate::compiler::parser::{Decl, Expr, Program, Stmt};
+use crate::compiler::parser::{Expr, Program, Stmt};
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -29,9 +29,9 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn run(&mut self, prgm: &Program) {
-        let mut decls = prgm.declarations.iter();
-        while let Some(decl) = decls.next() {
-            match &self.execute_decl(decl) {
+        let mut decls = prgm.statements.iter();
+        while let Some(stmt) = decls.next() {
+            match &self.execute_stmt(stmt) {
                 Ok(()) => {}
                 Err(err) => println!("{err:?}"),
             }
@@ -44,20 +44,14 @@ impl Interpreter {
         }
     }
 
-    fn execute_decl(&mut self, decl: &Decl) -> Result<(), RuntimeError> {
-        match decl {
-            Decl::Statement(stmt) => self.execute_statement(stmt),
-            Decl::VarDecl { name, initializer } => {
-                self.globals.set(name, self.evaluate(initializer)?);
-                Ok(())
-            }
-        }
-    }
-
-    fn execute_statement(&self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
                 println!("{}", self.evaluate(expr)?);
+                Ok(())
+            }
+            Stmt::VarDecl { name, initializer } => {
+                self.globals.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
             Stmt::Expression(_) => Ok(()),
