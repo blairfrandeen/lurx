@@ -36,20 +36,31 @@ impl ErrorReport for parser::ParseError {
 }
 
 impl ErrorReport for interpreter::RuntimeError {
-    #[allow(unused)]
     fn report(&self, source: &String) {
         match &self {
             interpreter::RuntimeError::TypeError {
-                left,
+                left: _,
                 operator,
-                right,
-            } => todo!(),
+                right: _,
+            } => {
+                println!("TypeError on or near line {}:", operator.line_num(&source));
+                show_error_token(&operator, &source);
+            }
             interpreter::RuntimeError::ZeroDivision {
-                left,
+                left: _,
                 operator,
-                right,
-            } => todo!(),
-            interpreter::RuntimeError::InvalidOperand { operator, operand } => todo!(),
+                right: _,
+            } => {
+                println!("ZeroDivision Error, Line {}:", operator.line_num(&source));
+                show_error_token(&operator, &source);
+            }
+            interpreter::RuntimeError::InvalidOperand {
+                operator,
+                operand: _,
+            } => {
+                println!("InvalidOperand Error, Line {}:", operator.line_num(&source));
+                show_error_token(&operator, &source);
+            }
             interpreter::RuntimeError::NotImplemented => println!("Not implemented!"),
             interpreter::RuntimeError::NameError(name) => {
                 let ident = match name.literal.as_ref().unwrap() {
