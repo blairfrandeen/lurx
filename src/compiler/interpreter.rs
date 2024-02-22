@@ -54,7 +54,13 @@ impl Interpreter {
                 self.globals.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
-            Stmt::Expression(_) => Ok(()),
+            Stmt::Expression(expr) => match expr {
+                Expr::Assign { name, value } => {
+                    self.globals.update(name, self.evaluate(value)?)?;
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
         }
     }
 
@@ -68,6 +74,8 @@ impl Interpreter {
             } => self.eval_binary(left, operator, right),
             Expr::Grouping(expr) => self.eval_grouping(expr),
             Expr::Literal(token) => self.eval_literal(token),
+            Expr::Variable(token) => self.eval_literal(token),
+            Expr::Assign { name: _, value: _ } => todo!(),
         }
     }
 

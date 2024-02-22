@@ -50,6 +50,11 @@ pub enum Expr {
         right: Box<Expr>,
     },
     Grouping(Box<Expr>),
+    Variable(Token),
+    Assign {
+        name: String,
+        value: Box<Expr>,
+    },
 }
 
 pub fn program(tokens: Vec<Token>) -> Program {
@@ -72,18 +77,19 @@ pub fn program(tokens: Vec<Token>) -> Program {
     Program { statements, errors }
 }
 
-pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
+fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
     let next_token = tokens.peek().expect("Unexpected EOF!");
     let decl = match next_token.type_ {
         TokenType::VAR => {
             tokens.next(); // consume var token
-            let name = match_token(tokens, TokenType::IDENTIFIER)?;
-            match_token(tokens, TokenType::EQUAL)?;
+            let name = consume_token(tokens, TokenType::IDENTIFIER)?;
+            consume_token(tokens, TokenType::EQUAL)?;
             let initializer = expression(tokens)?;
             Stmt::VarDecl { name, initializer }
         }
         _ => statement(tokens)?,
     };
+
     let lookahead = tokens.peek().expect("Unexpected EOF!");
     match lookahead.type_ {
         TokenType::SEMICOLON => {
@@ -97,7 +103,7 @@ pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
     }
 }
 
-pub fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
+fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
     let next_token = tokens.peek().expect("Unexpected EOF!");
     let stmt = match next_token.type_ {
         TokenType::PRINT => {
@@ -110,7 +116,31 @@ pub fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<S
 }
 
 pub fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
-    equality(tokens)
+    assignment(tokens)
+}
+
+fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let expr = equality(tokens)?;
+
+    match tokens.next_if(|tok| tok.type_ == TokenType::EQUAL) {
+        Some(_) => {
+            let value = assignment(tokens)?;
+            match expr {
+                Expr::Variable(tok) => {
+                    let name = tok
+                        .literal
+                        .expect("Variable IDENTIFIER token without literal!")
+                        .to_string();
+                    Ok(Expr::Assign {
+                        name,
+                        value: Box::new(value),
+                    })
+                }
+                _ => panic!("Invalid assignment target!"),
+            }
+        }
+        None => Ok(expr),
+    }
 }
 
 fn equality(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
@@ -198,9 +228,10 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
             | (tok.type_ == TokenType::FALSE)
             | (tok.type_ == TokenType::TRUE)
             | (tok.type_ == TokenType::NIL)
-            | (tok.type_ == TokenType::IDENTIFIER)
     }) {
         Ok(Expr::Literal(next_token))
+    } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::IDENTIFIER) {
+        Ok(Expr::Variable(next_token))
     } else if let Some(next_token) = tokens.next_if(|tok| tok.type_ == TokenType::LEFT_PAREN) {
         let expr = expression(tokens)?;
         let closing_paren = tokens.next().expect("Unexpected EOF!");
@@ -224,8 +255,8 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
 //////////////////////////////////////////////////////////////////
 
 /// Ensure the next token in a token iterator is of the expected type
-/// Return that token if successful
-fn match_token(
+/// Advance the iterator, and return that token if successful
+fn consume_token(
     tokens: &mut Peekable<impl Iterator<Item = Token>>,
     expected: TokenType,
 ) -> Result<Token, ParseError> {
