@@ -105,6 +105,31 @@ fn show_error_token(token: &lexer::Token, source: &String) {
     println!("{arrows}");
 }
 
+#[allow(unused)]
+fn show_previous_error_token(token: &lexer::Token, source: &String) {
+    // TODO: Work in progress, not currently working
+    // See issue 6
+    let mut line_num = match token.loc.0 {
+        0 => token.line_num(&source) - 1,
+        _ => token.line_num(&source),
+    };
+    if source.lines().count() == 1 {
+        line_num += 1;
+    }
+    let current_line = &source
+        .lines()
+        .nth(line_num - 1)
+        .expect("source should have correct number of lines");
+    let line_index = match token.loc.0 {
+        0 => current_line.len(),
+        _ => token.line_index(&source),
+    };
+    println!("\t{current_line}");
+    let arrows = format!("{:^>1$}", "", 1);
+    print!("\t{: >1$}", "", line_index);
+    println!("{arrows}");
+}
+
 impl lexer::Token {
     /// Get the line number that the token appears on in a given string of source code
     fn line_num(&self, source: &String) -> usize {
