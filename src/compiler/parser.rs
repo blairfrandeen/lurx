@@ -72,35 +72,6 @@ pub fn program(tokens: Vec<Token>) -> Program {
     Program { statements, errors }
 }
 
-fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
-    while let Some(current_token) = tokens.peek() {
-        match current_token.type_ {
-            // if we get to a semicolon, we suspect we're at a statement boundary, so we consume it
-            // and move on
-            TokenType::SEMICOLON => {
-                tokens.next();
-                return;
-            }
-            // If we get to a token that typically starts a statement, we presume that a semicolon
-            // was missing and we return without consuming the token so we can start a new
-            // statement.
-            TokenType::CLASS => return,
-            TokenType::FUN => return,
-            TokenType::VAR => return,
-            TokenType::FOR => return,
-            TokenType::IF => return,
-            TokenType::WHILE => return,
-            TokenType::PRINT => return,
-            TokenType::RETURN => return,
-            _ => {
-                // anything else, consume the token and keep trying to find a statement boundary.
-                tokens.next();
-                continue;
-            }
-        }
-    }
-}
-
 pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt, ParseError> {
     let next_token = tokens.peek().expect("Unexpected EOF!");
     let decl = match next_token.type_ {
@@ -123,23 +94,6 @@ pub fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result
             expected: TokenType::SEMICOLON,
             found: lookahead.clone(),
         }),
-    }
-}
-
-/// Ensure the next token in a token iterator is of the expected type
-/// Return that token if successful
-fn match_token(
-    tokens: &mut Peekable<impl Iterator<Item = Token>>,
-    expected: TokenType,
-) -> Result<Token, ParseError> {
-    let next_token = tokens.next().expect("Unexpected EOF!");
-    if next_token.type_ == expected {
-        Ok(next_token)
-    } else {
-        Err(ParseError::ExpectedToken {
-            expected,
-            found: next_token,
-        })
     }
 }
 
@@ -262,6 +216,58 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
     } else {
         let next_token = tokens.next().expect("Unexpected EOF!");
         Err(ParseError::NotImplemented(next_token.clone()))
+    }
+}
+
+//////////////////////////////////////////////////////////////////
+// HELPER FUNCTIONS
+//////////////////////////////////////////////////////////////////
+
+/// Ensure the next token in a token iterator is of the expected type
+/// Return that token if successful
+fn match_token(
+    tokens: &mut Peekable<impl Iterator<Item = Token>>,
+    expected: TokenType,
+) -> Result<Token, ParseError> {
+    let next_token = tokens.next().expect("Unexpected EOF!");
+    if next_token.type_ == expected {
+        Ok(next_token)
+    } else {
+        Err(ParseError::ExpectedToken {
+            expected,
+            found: next_token,
+        })
+    }
+}
+
+/// This function should be called in case of a ParseError. This will advance the tokens until the
+/// probable beginning of a new statement is found.
+fn synchronize(tokens: &mut Peekable<impl Iterator<Item = Token>>) {
+    while let Some(current_token) = tokens.peek() {
+        match current_token.type_ {
+            // if we get to a semicolon, we suspect we're at a statement boundary, so we consume it
+            // and move on
+            TokenType::SEMICOLON => {
+                tokens.next();
+                return;
+            }
+            // If we get to a token that typically starts a statement, we presume that a semicolon
+            // was missing and we return without consuming the token so we can start a new
+            // statement.
+            TokenType::CLASS => return,
+            TokenType::FUN => return,
+            TokenType::VAR => return,
+            TokenType::FOR => return,
+            TokenType::IF => return,
+            TokenType::WHILE => return,
+            TokenType::PRINT => return,
+            TokenType::RETURN => return,
+            _ => {
+                // anything else, consume the token and keep trying to find a statement boundary.
+                tokens.next();
+                continue;
+            }
+        }
     }
 }
 
