@@ -30,6 +30,7 @@ pub struct Interpreter {
     env: Environment,
     out: Vec<u8>,
     flush: bool,
+    print_expr: bool,
 }
 
 impl Interpreter {
@@ -52,6 +53,7 @@ impl Interpreter {
             env: Environment::new(),
             out: vec![],
             flush: false,
+            print_expr: false,
         }
     }
 
@@ -63,6 +65,10 @@ impl Interpreter {
 
     pub fn set_flush(&mut self, flush: bool) {
         self.flush = flush;
+    }
+
+    pub fn set_print_expr(&mut self, print_expr: bool) {
+        self.print_expr = print_expr;
     }
 
     fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
@@ -80,7 +86,12 @@ impl Interpreter {
                     self.env.update(name, self.evaluate(value)?)?;
                     Ok(())
                 }
-                _ => Ok(()),
+                _ => {
+                    if self.print_expr {
+                        let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
+                    }
+                    Ok(())
+                }
             },
             Stmt::Block(stmts) => {
                 self.env = Environment::enclosed(self.env.clone());
@@ -160,7 +171,7 @@ impl Interpreter {
                         right,
                     });
                 } else {
-                    LoxValue::Number(right_value.unwrap() - left_value.unwrap())
+                    LoxValue::Number(left_value.unwrap() - right_value.unwrap())
                 }
             }
             TokenType::PLUS => {

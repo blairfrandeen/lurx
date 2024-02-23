@@ -57,6 +57,7 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter) {
 use rustyline;
 fn repl() -> rustyline::Result<()> {
     let mut interp = interpreter::Interpreter::new();
+    interp.set_print_expr(true);
     let mut rl = rustyline::DefaultEditor::new()?;
     loop {
         let readline = rl.readline(">> ");
