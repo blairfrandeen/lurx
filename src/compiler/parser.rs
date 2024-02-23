@@ -36,8 +36,16 @@ pub struct Program {
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
-    VarDecl { name: Token, initializer: Expr },
+    VarDecl {
+        name: Token,
+        initializer: Expr,
+    },
     Block(Vec<Stmt>),
+    Conditional {
+        condition: Expr,
+        true_branch: Box<Stmt>,
+        false_branch: Option<Box<Stmt>>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -92,6 +100,8 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
         TokenType::VAR => {
             tokens.next(); // consume var token
             let name = consume_token(tokens, TokenType::IDENTIFIER)?;
+            // TODO: Allow variables to be declared without initializers
+            // See issue #7
             consume_token(tokens, TokenType::EQUAL)?;
             let initializer = expression(tokens)?;
             Stmt::VarDecl { name, initializer }
@@ -101,6 +111,11 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
 
     match decl {
         Stmt::Block(_) => Ok(decl),
+        Stmt::Conditional {
+            condition: _,
+            true_branch: _,
+            false_branch: _,
+        } => Ok(decl),
         _ => {
             let lookahead = tokens.peek().expect("Unexpected EOF!");
             match lookahead.type_ {
@@ -137,6 +152,24 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
 
             consume_token(tokens, TokenType::RIGHT_BRACE)?;
             Stmt::Block(stmts)
+        }
+        TokenType::IF => {
+            tokens.next();
+            let condition = expression(tokens)?;
+            let true_branch = Box::new(declaration(tokens)?);
+            let next_token = tokens.peek().expect("Unexpected EOF!");
+            let false_branch = match next_token.type_ {
+                TokenType::ELSE => {
+                    tokens.next();
+                    Some(Box::new(declaration(tokens)?))
+                }
+                _ => None,
+            };
+            Stmt::Conditional {
+                condition,
+                true_branch,
+                false_branch,
+            }
         }
         _ => Stmt::Expression(expression(tokens)?),
     };

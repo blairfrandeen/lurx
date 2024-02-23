@@ -101,6 +101,20 @@ impl Interpreter {
                 self.env = self.env.enclosing();
                 Ok(())
             }
+            Stmt::Conditional {
+                condition,
+                true_branch,
+                false_branch,
+            } => {
+                if is_truthy(&self.evaluate(condition)?) {
+                    self.execute_stmt(true_branch)
+                } else {
+                    match false_branch {
+                        Some(branch) => self.execute_stmt(branch),
+                        None => Ok(()),
+                    }
+                }
+            }
         }
     }
 
@@ -243,6 +257,14 @@ impl Interpreter {
                 value: token.value(),
             }),
         }
+    }
+}
+
+fn is_truthy(obj: &LoxObject) -> bool {
+    match &obj.value {
+        LoxValue::False => false,
+        LoxValue::Nil => false,
+        _ => true,
     }
 }
 
@@ -706,6 +728,36 @@ mod tests {
             scopes.as_str(),
             "inner a\nouter b\nglobal c\nouter a\nouter b\nglobal c\nglobal a\nglobal b\nglobal c\n",
         )
+    }
+
+    #[test]
+    fn test_conditionals() {
+        // most basic conditional
+        test_output("if true print 1;", "1\n");
+
+        // else statement
+        test_output("if false print 2; else print 1;", "1\n");
+
+        // with braces
+        test_output("if false { print 2; } else print 1;", "1\n");
+
+        // some assignment and more complex cases
+        test_output(
+            "var a = 0; if 5*5==26 { a = 2; } else { a = 1; } print a;",
+            "1\n",
+        );
+
+        // else if
+        test_output(
+            "var a = 0; var b = 5; if b*5==26 { a = 2; } else if b == 5 { a = 1; } else { a = 4; } print a;",
+            "1\n",
+        );
+
+        // nesting
+        test_output(
+            "if true { if true { if false { print 2; } else { print 1; } } }",
+            "1\n",
+        );
     }
 
     fn test_output(source: &str, expected: &str) {
