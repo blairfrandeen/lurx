@@ -29,10 +29,10 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn run(&mut self, prgm: &Program) {
-        let mut decls = prgm.statements.iter();
-        while let Some(stmt) = decls.next() {
-            match &self.execute_stmt(stmt) {
+    pub fn run(&mut self, prgm: &Program, mut writer: impl std::io::Write) {
+        let mut stmts = prgm.statements.iter();
+        while let Some(stmt) = stmts.next() {
+            match &self.execute_stmt(stmt, &mut writer) {
                 Ok(()) => {}
                 Err(err) => err.report(&prgm.source),
             }
@@ -45,10 +45,14 @@ impl Interpreter {
         }
     }
 
-    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn execute_stmt(
+        &mut self,
+        stmt: &Stmt,
+        mut writer: impl std::io::Write,
+    ) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
-                println!("{}", self.evaluate(expr)?);
+                let _ = writeln!(writer, "{}", self.evaluate(expr)?);
                 Ok(())
             }
             Stmt::VarDecl { name, initializer } => {
@@ -644,11 +648,20 @@ mod tests {
 
     #[test]
     fn test_hello_world() {
-        let source = "print \"hello world!\";".to_string();
-        let tokens = lexer::scan_source(&source).unwrap();
-        let program = parser::program(tokens, source);
+        assert!(test_output("print \"hello world!\";", "hello world!\n"));
+    }
+
+    #[test]
+    fn test_assignment() {
+        assert!(test_output("var a = 7; a = 9*a; print a;", "63\n"));
+    }
+
+    fn test_output(source: &str, expected: &str) -> bool {
+        let tokens = lexer::scan_source(&source.to_string()).unwrap();
+        let program = parser::program(tokens, source.to_string());
         let mut interp = interpreter::Interpreter::new();
-        interp.run(&program); // should not panic
-                              // TODO: Test standard output
+        let mut result = Vec::new();
+        interp.run(&program, &mut result);
+        result == expected.as_bytes()
     }
 }
