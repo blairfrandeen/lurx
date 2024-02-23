@@ -4,6 +4,8 @@ use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::object::{LoxObject, LoxValue};
 use crate::compiler::parser::{Expr, Program, Stmt};
 
+use std::io::Write;
+
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
     InvalidOperand {
@@ -25,15 +27,21 @@ pub enum RuntimeError {
 }
 
 pub struct Interpreter {
-    globals: Environment,
+    env: Environment,
+    out: Vec<u8>,
+    flush: bool,
 }
 
 impl Interpreter {
-    pub fn run(&mut self, prgm: &Program, mut writer: impl std::io::Write) {
+    pub fn run(&mut self, prgm: &Program) {
         let mut stmts = prgm.statements.iter();
         while let Some(stmt) = stmts.next() {
-            match &self.execute_stmt(stmt, &mut writer) {
-                Ok(()) => {}
+            match &self.execute_stmt(stmt) {
+                Ok(()) => {
+                    if self.flush {
+                        self.flush()
+                    }
+                }
                 Err(err) => err.report(&prgm.source),
             }
         }
@@ -41,31 +49,47 @@ impl Interpreter {
 
     pub fn new() -> Self {
         Interpreter {
-            globals: Environment::new(),
+            env: Environment::new(),
+            out: vec![],
+            flush: false,
         }
     }
 
-    fn execute_stmt(
-        &mut self,
-        stmt: &Stmt,
-        mut writer: impl std::io::Write,
-    ) -> Result<(), RuntimeError> {
+    pub fn flush(&mut self) {
+        let out = String::from_utf8(self.out.clone()).unwrap();
+        print!("{}", out);
+        self.out = vec![];
+    }
+
+    pub fn set_flush(&mut self, flush: bool) {
+        self.flush = flush;
+    }
+
+    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
-                let _ = writeln!(writer, "{}", self.evaluate(expr)?);
+                let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
                 Ok(())
             }
             Stmt::VarDecl { name, initializer } => {
-                self.globals.set(name, self.evaluate(initializer)?);
+                self.env.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
-                    self.globals.update(name, self.evaluate(value)?)?;
+                    self.env.update(name, self.evaluate(value)?)?;
                     Ok(())
                 }
                 _ => Ok(()),
             },
+            Stmt::Block(stmts) => {
+                self.env = Environment::enclosed(self.env.clone());
+                for stmt in stmts.into_iter() {
+                    self.execute_stmt(stmt)?;
+                }
+                self.env = self.env.enclosing();
+                Ok(())
+            }
         }
     }
 
@@ -203,7 +227,7 @@ impl Interpreter {
 
     fn eval_literal(&self, token: &Token) -> Result<LoxObject, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => self.globals.get(&token).cloned(),
+            TokenType::IDENTIFIER => self.env.get(&token).cloned(),
             _ => Ok(LoxObject {
                 value: token.value(),
             }),
@@ -648,20 +672,37 @@ mod tests {
 
     #[test]
     fn test_hello_world() {
-        assert!(test_output("print \"hello world!\";", "hello world!\n"));
+        test_output("print \"hello world!\";", "hello world!\n");
     }
 
     #[test]
     fn test_assignment() {
-        assert!(test_output("var a = 7; a = 9*a; print a;", "63\n"));
+        test_output("var a = 7; a = 9*a; print a;", "63\n");
     }
 
-    fn test_output(source: &str, expected: &str) -> bool {
+    #[test]
+    fn test_scopes() {
+        test_output(
+            "var a = 7; var b = 5; { var a = 1; print a; {var a = 2; print a; print b;}} print a;",
+            "1\n2\n5\n7\n",
+        );
+    }
+
+    #[test]
+    fn test_ch8_scopes() {
+        let scopes = std::fs::read_to_string("tests/scopes.lox").expect("file should exist");
+        test_output(
+            scopes.as_str(),
+            "inner a\nouter b\nglobal c\nouter a\nouter b\nglobal c\nglobal a\nglobal b\nglobal c\n",
+        )
+    }
+
+    fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
         let mut interp = interpreter::Interpreter::new();
-        let mut result = Vec::new();
-        interp.run(&program, &mut result);
-        result == expected.as_bytes()
+        interp.set_flush(false);
+        interp.run(&program);
+        assert_eq!(interp.out, expected.as_bytes());
     }
 }

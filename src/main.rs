@@ -46,7 +46,8 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter) {
 
     let program = parser::program(tokens, source.clone());
     if program.errors.is_empty() {
-        interp.run(&program, &mut std::io::stdout());
+        interp.run(&program);
+        interp.flush();
     } else {
         for error in program.errors.iter() {
             error.report(&source);

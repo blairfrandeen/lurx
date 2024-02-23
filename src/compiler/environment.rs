@@ -4,7 +4,7 @@ use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
 use crate::compiler::object::LoxObject;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Environment {
     data: HashMap<String, LoxObject>,
     enclosing: Option<Box<Environment>>,
@@ -37,6 +37,17 @@ impl Environment {
             data: HashMap::new(),
             enclosing: None,
         }
+    }
+
+    pub fn enclosed(enclosing: Environment) -> Self {
+        Environment {
+            data: HashMap::new(),
+            enclosing: Some(Box::new(enclosing)),
+        }
+    }
+
+    pub fn enclosing(&self) -> Self {
+        *self.enclosing.clone().unwrap()
     }
 
     fn get_ident(name: &Token) -> String {

@@ -37,6 +37,7 @@ pub enum Stmt {
     Expression(Expr),
     Print(Expr),
     VarDecl { name: Token, initializer: Expr },
+    Block(Vec<Stmt>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,16 +99,21 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
         _ => statement(tokens)?,
     };
 
-    let lookahead = tokens.peek().expect("Unexpected EOF!");
-    match lookahead.type_ {
-        TokenType::SEMICOLON => {
-            tokens.next();
-            Ok(decl)
+    match decl {
+        Stmt::Block(_) => Ok(decl),
+        _ => {
+            let lookahead = tokens.peek().expect("Unexpected EOF!");
+            match lookahead.type_ {
+                TokenType::SEMICOLON => {
+                    tokens.next();
+                    Ok(decl)
+                }
+                _ => Err(ParseError::ExpectedToken {
+                    expected: TokenType::SEMICOLON,
+                    found: lookahead.clone(),
+                }),
+            }
         }
-        _ => Err(ParseError::ExpectedToken {
-            expected: TokenType::SEMICOLON,
-            found: lookahead.clone(),
-        }),
     }
 }
 
@@ -117,6 +123,20 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
         TokenType::PRINT => {
             tokens.next(); // consume print token
             Stmt::Print(expression(tokens)?)
+        }
+        TokenType::LEFT_BRACE => {
+            tokens.next();
+            let mut stmts = Vec::new();
+            while let Some(next_token) = tokens.peek() {
+                let stmt = match next_token.type_ {
+                    TokenType::RIGHT_BRACE => break,
+                    _ => declaration(tokens)?,
+                };
+                stmts.push(stmt);
+            }
+
+            consume_token(tokens, TokenType::RIGHT_BRACE)?;
+            Stmt::Block(stmts)
         }
         _ => Stmt::Expression(expression(tokens)?),
     };
