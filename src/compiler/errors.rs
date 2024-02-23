@@ -31,6 +31,11 @@ impl ErrorReport for parser::ParseError {
                 println!("Expected Token: {expected:?}");
                 show_error_token(found, &source);
             }
+            parser::ParseError::InvalidAssignmentTarget(target) => {
+                println!("Invalid Assignment Target: {:?}", target);
+                // TODO: Show target more cleanly than current debug output.
+                // See GitHub issue #2
+            }
         }
     }
 }

@@ -25,10 +25,10 @@ impl Environment {
         let _ = &self.data.insert(Self::get_ident(&name), value);
     }
 
-    pub fn update(&mut self, name: &String, value: LoxObject) -> Result<(), RuntimeError> {
-        match &self.data.insert(name.to_string(), value) {
+    pub fn update(&mut self, name: &Token, value: LoxObject) -> Result<(), RuntimeError> {
+        match &self.data.insert(Self::get_ident(&name), value) {
             Some(_) => Ok(()),
-            None => todo!(),
+            None => Err(RuntimeError::NameError(name.clone())),
         }
     }
 

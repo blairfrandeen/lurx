@@ -8,6 +8,7 @@ pub enum ParseError {
     UnexpectedToken(Token),
     NotImplemented(Token),
     ExpectedToken { expected: TokenType, found: Token },
+    InvalidAssignmentTarget(Expr),
     MissingEof,
 }
 
@@ -52,8 +53,10 @@ pub enum Expr {
     },
     Grouping(Box<Expr>),
     Variable(Token),
+    // NOTE: Official implementation uses a String for `name` below. I've chosen to use a token for
+    // better error handling; unsure if this will bite me as we implement fields.
     Assign {
-        name: String,
+        name: Token,
         value: Box<Expr>,
     },
 }
@@ -131,17 +134,11 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr
         Some(_) => {
             let value = assignment(tokens)?;
             match expr {
-                Expr::Variable(tok) => {
-                    let name = tok
-                        .literal
-                        .expect("Variable IDENTIFIER token without literal!")
-                        .to_string();
-                    Ok(Expr::Assign {
-                        name,
-                        value: Box::new(value),
-                    })
-                }
-                _ => panic!("Invalid assignment target!"),
+                Expr::Variable(name) => Ok(Expr::Assign {
+                    name,
+                    value: Box::new(value),
+                }),
+                _ => Err(ParseError::InvalidAssignmentTarget(expr)),
             }
         }
         None => Ok(expr),
