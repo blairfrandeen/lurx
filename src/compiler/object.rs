@@ -1,3 +1,4 @@
+use crate::compiler::LoxFloat;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -8,7 +9,7 @@ pub struct LoxObject {
 #[derive(Debug, PartialEq, Clone)]
 pub enum LoxValue {
     StrLit(String),
-    Number(f32),
+    Number(LoxFloat),
     True,
     False,
     Nil,
@@ -35,7 +36,7 @@ impl LoxObject {
             _ => false,
         }
     }
-    pub fn number(&self) -> Option<f32> {
+    pub fn number(&self) -> Option<LoxFloat> {
         match &self.value {
             LoxValue::Number(n) => Some(*n),
             _ => None,

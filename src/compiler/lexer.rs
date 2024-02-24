@@ -4,6 +4,8 @@ use std::fmt::{Debug, Display, Formatter};
 
 use thiserror::Error;
 
+use crate::compiler::LoxFloat;
+
 #[derive(Error, Debug, PartialEq)]
 pub enum ScanError {
     #[error("invalid tokens")]
@@ -93,7 +95,7 @@ pub enum TokenType {
 pub enum Literal {
     StringLit(String),
     Ident(String),
-    NumLit(f32),
+    NumLit(LoxFloat),
 }
 
 #[derive(Clone)]
@@ -125,7 +127,7 @@ impl Token {
             ..Default::default()
         }
     }
-    pub fn numlit(literal: f32) -> Self {
+    pub fn numlit(literal: LoxFloat) -> Self {
         Token {
             type_: TokenType::NUMLIT,
             literal: Some(Literal::NumLit(literal)),
@@ -270,7 +272,7 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
                             found_decimal = true;
                         }
                     }
-                    let num_value: f32 = lexeme.parse().expect("Error parsing float!");
+                    let num_value: LoxFloat = lexeme.parse().expect("Error parsing float!");
                     token.literal = Some(Literal::NumLit(num_value));
                     token.type_ = TokenType::NUMLIT;
 
