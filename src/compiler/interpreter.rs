@@ -116,7 +116,7 @@ impl Interpreter {
                     }
                 }
             }
-            Stmt::Loop {
+            Stmt::WhileLoop {
                 condition,
                 statements,
             } => {
@@ -124,6 +124,9 @@ impl Interpreter {
                     self.execute_stmt(statements)?;
                 }
                 Ok(())
+            }
+            Stmt::ForLoop { .. } => {
+                todo!()
             }
         }
     }
