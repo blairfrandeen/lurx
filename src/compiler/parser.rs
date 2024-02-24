@@ -203,7 +203,7 @@ pub fn expression(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<
 }
 
 fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
-    let expr = equality(tokens)?;
+    let expr = logic_or(tokens)?;
 
     match tokens.next_if(|tok| tok.type_ == TokenType::EQUAL) {
         Some(_) => {
@@ -217,6 +217,36 @@ fn assignment(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr
             }
         }
         None => Ok(expr),
+    }
+}
+
+fn logic_or(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let left = logic_and(tokens)?;
+    match tokens.next_if(|tok| tok.type_ == TokenType::OR) {
+        Some(operator) => {
+            let right = logic_and(tokens)?;
+            Ok(Expr::Logical {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            })
+        }
+        None => Ok(left),
+    }
+}
+
+fn logic_and(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let left = equality(tokens)?;
+    match tokens.next_if(|tok| tok.type_ == TokenType::AND) {
+        Some(operator) => {
+            let right = equality(tokens)?;
+            Ok(Expr::Logical {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            })
+        }
+        None => Ok(left),
     }
 }
 
@@ -625,5 +655,31 @@ mod tests {
         let prgm = program(tokens, sync_prgm);
         assert_eq!(prgm.errors.len(), 1);
         assert_eq!(prgm.statements.len(), 1);
+    }
+
+    #[test]
+    fn test_logic_or() {
+        let mut token_iter = token_iter("true or false;");
+        assert_eq!(
+            expression(&mut token_iter),
+            Ok(Expr::Logical {
+                left: Box::new(Expr::Literal(Token::from_type(TokenType::TRUE))),
+                operator: Token::from_type(TokenType::OR),
+                right: Box::new(Expr::Literal(Token::from_type(TokenType::FALSE))),
+            })
+        );
+    }
+
+    #[test]
+    fn test_logic_and() {
+        let mut token_iter = token_iter("true and false;");
+        assert_eq!(
+            expression(&mut token_iter),
+            Ok(Expr::Logical {
+                left: Box::new(Expr::Literal(Token::from_type(TokenType::TRUE))),
+                operator: Token::from_type(TokenType::AND),
+                right: Box::new(Expr::Literal(Token::from_type(TokenType::FALSE))),
+            })
+        );
     }
 }
