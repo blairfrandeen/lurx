@@ -140,7 +140,32 @@ impl Interpreter {
             Expr::Literal(token) => self.eval_literal(token),
             Expr::Variable(token) => self.eval_literal(token),
             Expr::Assign { name: _, value: _ } => todo!(),
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => self.eval_logical(left, operator, right),
         }
+    }
+
+    fn eval_logical(
+        &self,
+        left: &Expr,
+        operator: &Token,
+        right: &Expr,
+    ) -> Result<LoxObject, RuntimeError> {
+        let right = self.evaluate(right)?;
+        let left = self.evaluate(left)?;
+        let result = match operator.type_ {
+            TokenType::AND => is_truthy(&left) & is_truthy(&right),
+            TokenType::OR => is_truthy(&left) | is_truthy(&right),
+            _ => panic!("Invalid operator for logical: {}", operator),
+        };
+        let value = match result {
+            true => LoxValue::True,
+            false => LoxValue::False,
+        };
+        Ok(LoxObject { value })
     }
 
     fn eval_binary(
@@ -347,6 +372,47 @@ mod tests {
     use crate::interpreter;
     use crate::lexer::{self, token_iter};
     use crate::parser;
+
+    #[test]
+    fn test_logical_or() {
+        let true_exp = parser::Expr::Literal(Token::from_type(TokenType::TRUE));
+        let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
+        let mut interp = Interpreter::new();
+        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::OR), &false_exp);
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::True
+            })
+        );
+        let result = interp.eval_logical(&false_exp, &Token::from_type(TokenType::OR), &false_exp);
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::False
+            })
+        );
+    }
+    #[test]
+    fn test_logical_and() {
+        let true_exp = parser::Expr::Literal(Token::from_type(TokenType::TRUE));
+        let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
+        let mut interp = Interpreter::new();
+        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &true_exp);
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::True
+            })
+        );
+        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &false_exp);
+        assert_eq!(
+            result,
+            Ok(LoxObject {
+                value: LoxValue::False
+            })
+        );
+    }
 
     #[test]
     fn test_eval_unary_not_true() {

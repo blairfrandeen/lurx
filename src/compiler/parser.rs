@@ -64,11 +64,16 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
+    Logical {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
     Grouping(Box<Expr>),
     Variable(Token),
-    // NOTE: Official implementation uses a String for `name` below. I've chosen to use a token for
-    // better error handling; unsure if this will bite me as we implement fields.
     Assign {
+        // NOTE: Official implementation uses a String for `name` below. I've chosen to use a token for
+        // better error handling; unsure if this will bite me as we implement fields.
         name: Token,
         value: Box<Expr>,
     },
