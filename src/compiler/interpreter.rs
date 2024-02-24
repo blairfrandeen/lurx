@@ -72,6 +72,7 @@ impl Interpreter {
     }
 
     fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        // dbg!(&self.env, &stmt);
         match &stmt {
             Stmt::Print(expr) => {
                 let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
@@ -114,6 +115,15 @@ impl Interpreter {
                         None => Ok(()),
                     }
                 }
+            }
+            Stmt::Loop {
+                condition,
+                statements,
+            } => {
+                while is_truthy(&self.evaluate(condition)?) {
+                    self.execute_stmt(statements)?;
+                }
+                Ok(())
             }
         }
     }
@@ -757,6 +767,19 @@ mod tests {
         test_output(
             "if true { if true { if false { print 2; } else { print 1; } } }",
             "1\n",
+        );
+    }
+
+    #[test]
+    fn test_assign_in_scope() {
+        test_output("var a = 1; { a = 2; print a; } print a;", "2\n2\n");
+    }
+
+    #[test]
+    fn test_while() {
+        test_output(
+            "var a = 0; while (a < 5) { a = a + 1; print a; }",
+            "1\n2\n3\n4\n5\n",
         );
     }
 

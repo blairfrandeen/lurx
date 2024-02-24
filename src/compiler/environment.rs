@@ -26,9 +26,15 @@ impl Environment {
     }
 
     pub fn update(&mut self, name: &Token, value: LoxObject) -> Result<(), RuntimeError> {
-        match &self.data.insert(Self::get_ident(&name), value) {
-            Some(_) => Ok(()),
-            None => Err(RuntimeError::NameError(name.clone())),
+        match &self.data.contains_key(&Self::get_ident(&name)) {
+            true => {
+                let _ = &self.data.insert(Self::get_ident(&name), value);
+                Ok(())
+            }
+            false => match self.enclosing.as_deref_mut() {
+                Some(enc) => enc.update(name, value),
+                None => Err(RuntimeError::NameError(name.clone())),
+            },
         }
     }
 

@@ -46,6 +46,10 @@ pub enum Stmt {
         true_branch: Box<Stmt>,
         false_branch: Option<Box<Stmt>>,
     },
+    Loop {
+        condition: Expr,
+        statements: Box<Stmt>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -116,6 +120,10 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
             true_branch: _,
             false_branch: _,
         } => Ok(decl),
+        Stmt::Loop {
+            condition: _,
+            statements: _,
+        } => Ok(decl),
         _ => {
             let lookahead = tokens.peek().expect("Unexpected EOF!");
             match lookahead.type_ {
@@ -169,6 +177,15 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
                 condition,
                 true_branch,
                 false_branch,
+            }
+        }
+        TokenType::WHILE => {
+            tokens.next();
+            let condition = expression(tokens)?;
+            let statements = Box::new(declaration(tokens)?);
+            Stmt::Loop {
+                condition,
+                statements,
             }
         }
         _ => Stmt::Expression(expression(tokens)?),
