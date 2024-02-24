@@ -807,6 +807,12 @@ mod tests {
     }
 
     #[test]
+    fn test_fib_while() {
+        let scopes = std::fs::read_to_string("tests/fib_while.lox").expect("file should exist");
+        test_output(scopes.as_str(), "12586269025\n")
+    }
+
+    #[test]
     fn test_conditionals() {
         // most basic conditional
         test_output("if true print 1;", "1\n");
