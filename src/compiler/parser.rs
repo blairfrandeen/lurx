@@ -153,6 +153,12 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
             while let Some(next_token) = tokens.peek() {
                 let stmt = match next_token.type_ {
                     TokenType::RIGHT_BRACE => break,
+                    TokenType::EOF => {
+                        return Err(ParseError::ExpectedToken {
+                            expected: TokenType::RIGHT_BRACE,
+                            found: next_token.clone(),
+                        })
+                    }
                     _ => declaration(tokens)?,
                 };
                 stmts.push(stmt);
