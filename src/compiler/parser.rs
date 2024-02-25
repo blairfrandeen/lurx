@@ -79,6 +79,11 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        arguments: Vec<Expr>,
+        paren: Token,
+    },
 }
 
 pub fn program(tokens: Vec<Token>, source: String) -> Program {
@@ -366,10 +371,36 @@ fn unary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, Par
             let right = Box::new(unary(tokens)?);
             Ok(Expr::Unary { operator, right })
         } else {
-            primary(tokens)
+            call(tokens)
         }
     } else {
         panic!("unexpected EOF!");
+    }
+}
+
+fn call(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, ParseError> {
+    let expr = primary(tokens)?;
+    match tokens.next_if(|tok| tok.type_ == TokenType::LEFT_PAREN) {
+        Some(_) => {
+            let mut arguments: Vec<Expr> = Vec::new();
+            while let Some(next_tok) = tokens.peek() {
+                if next_tok.type_ == TokenType::RIGHT_PAREN {
+                    return Ok(Expr::Call {
+                        callee: Box::new(expr),
+                        arguments,
+                        paren: tokens.next().unwrap(),
+                    });
+                } else {
+                    arguments.push(expression(tokens)?);
+                    tokens.next_if(|tok| tok.type_ == TokenType::COMMA);
+                }
+            }
+            Err(ParseError::ExpectedToken {
+                expected: TokenType::RIGHT_PAREN,
+                found: tokens.next().expect("Unexpected EOF!"),
+            })
+        }
+        None => Ok(expr),
     }
 }
 
@@ -398,6 +429,7 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
         Err(ParseError::UnclosedParenthesis(next_token.clone()))
     } else {
         let next_token = tokens.next().expect("Unexpected EOF!");
+        println!("hi!");
         Err(ParseError::NotImplemented(next_token.clone()))
     }
 }
@@ -724,6 +756,47 @@ mod tests {
                 left: Box::new(Expr::Literal(Token::from_type(TokenType::TRUE))),
                 operator: Token::from_type(TokenType::AND),
                 right: Box::new(Expr::Literal(Token::from_type(TokenType::FALSE))),
+            })
+        );
+    }
+
+    #[test]
+    fn test_func_call_0_arg() {
+        let mut token_iter = token_iter("some_func();");
+        assert_eq!(
+            expression(&mut token_iter),
+            Ok(Expr::Call {
+                callee: Box::new(Expr::Variable(Token::identifier("some_func".to_string()))),
+                arguments: vec![],
+                paren: Token::from_type(TokenType::RIGHT_PAREN),
+            })
+        );
+    }
+    #[test]
+    fn test_func_call_1_arg() {
+        let mut token_iter = token_iter("some_func(x);");
+        assert_eq!(
+            expression(&mut token_iter),
+            Ok(Expr::Call {
+                callee: Box::new(Expr::Variable(Token::identifier("some_func".to_string()))),
+                arguments: vec![Expr::Variable(Token::identifier("x".to_string()))],
+                paren: Token::from_type(TokenType::RIGHT_PAREN),
+            })
+        );
+    }
+    #[test]
+    fn test_func_call_3_args() {
+        let mut token_iter = token_iter("some_func(x, y,z);");
+        assert_eq!(
+            expression(&mut token_iter),
+            Ok(Expr::Call {
+                callee: Box::new(Expr::Variable(Token::identifier("some_func".to_string()))),
+                arguments: vec![
+                    Expr::Variable(Token::identifier("x".to_string())),
+                    Expr::Variable(Token::identifier("y".to_string())),
+                    Expr::Variable(Token::identifier("z".to_string())),
+                ],
+                paren: Token::from_type(TokenType::RIGHT_PAREN),
             })
         );
     }

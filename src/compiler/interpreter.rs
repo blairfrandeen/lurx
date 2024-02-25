@@ -152,6 +152,7 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_logical(left, operator, right),
+            Expr::Call { .. } => todo!(),
         }
     }
 
