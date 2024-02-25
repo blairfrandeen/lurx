@@ -36,6 +36,9 @@ impl ErrorReport for parser::ParseError {
                 // TODO: Show target more cleanly than current debug output.
                 // See GitHub issue #2
             }
+            parser::ParseError::InvalidStatement(stmt) => {
+                println!("Invalid Statement: {:?}", stmt);
+            }
         }
     }
 }

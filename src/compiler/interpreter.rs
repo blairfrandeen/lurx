@@ -125,9 +125,6 @@ impl Interpreter {
                 }
                 Ok(())
             }
-            Stmt::ForLoop { .. } => {
-                todo!()
-            }
         }
     }
 
@@ -816,6 +813,12 @@ mod tests {
     }
 
     #[test]
+    fn test_fib_for() {
+        let scopes = std::fs::read_to_string("tests/fib_for.lox").expect("file should exist");
+        test_output(scopes.as_str(), "12586269025\n")
+    }
+
+    #[test]
     fn test_conditionals() {
         // most basic conditional
         test_output("if true print 1;", "1\n");
@@ -854,6 +857,22 @@ mod tests {
     fn test_while() {
         test_output(
             "var a = 0; while (a < 5) { a = a + 1; print a; }",
+            "1\n2\n3\n4\n5\n",
+        );
+    }
+
+    #[test]
+    fn test_for() {
+        test_output(
+            "for (var a = 0; a < 5; a = a + 1) { print a+1; }",
+            "1\n2\n3\n4\n5\n",
+        );
+    }
+
+    #[test]
+    fn test_for_no_incr() {
+        test_output(
+            "for (var a = 0; a < 5;) { a = a + 1; print a; }",
             "1\n2\n3\n4\n5\n",
         );
     }

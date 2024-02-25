@@ -9,6 +9,7 @@ pub enum ParseError {
     NotImplemented(Token),
     ExpectedToken { expected: TokenType, found: Token },
     InvalidAssignmentTarget(Expr),
+    InvalidStatement(Stmt),
     MissingEof,
 }
 
@@ -48,12 +49,6 @@ pub enum Stmt {
     },
     WhileLoop {
         condition: Expr,
-        statements: Box<Stmt>,
-    },
-    ForLoop {
-        initializer: Box<Stmt>,
-        condition: Expr,
-        increment: Expr,
         statements: Box<Stmt>,
     },
 }
@@ -191,6 +186,46 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
                 condition,
                 statements,
             }
+        }
+        TokenType::FOR => {
+            tokens.next();
+            consume_token(tokens, TokenType::LEFT_PAREN)?;
+
+            let initializer = declaration(tokens)?;
+            match initializer {
+                Stmt::Expression(_) => {}
+                Stmt::VarDecl { .. } => {}
+                _ => return Err(ParseError::InvalidStatement(initializer)),
+            };
+
+            let lookahead = tokens.peek().expect("Unexpected EOF!");
+            let condition = match lookahead.type_ {
+                TokenType::SEMICOLON => Expr::Literal(Token::from_type(TokenType::TRUE)),
+                _ => expression(tokens)?,
+            };
+            consume_token(tokens, TokenType::SEMICOLON)?;
+
+            let lookahead = tokens.peek().expect("Unexpected EOF!");
+            let increment = match lookahead.type_ {
+                TokenType::RIGHT_PAREN => None,
+                _ => Some(expression(tokens)?),
+            };
+            consume_token(tokens, TokenType::RIGHT_PAREN)?;
+
+            let statements = match increment {
+                Some(incr) => Stmt::Block(vec![
+                    declaration(tokens)?,
+                    Stmt::Expression(incr), // increment happens after the loop statements
+                ]),
+                None => declaration(tokens)?,
+            };
+            Stmt::Block(vec![
+                initializer,
+                Stmt::WhileLoop {
+                    condition,
+                    statements: Box::new(statements),
+                },
+            ])
         }
         _ => Stmt::Expression(expression(tokens)?),
     };
