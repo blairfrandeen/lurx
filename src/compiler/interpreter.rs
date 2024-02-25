@@ -82,6 +82,7 @@ impl Interpreter {
                 self.env.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
+            Stmt::FunDecl { .. } => todo!(),
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
                     self.env.update(name, self.evaluate(value)?)?;

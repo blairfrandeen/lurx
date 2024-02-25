@@ -41,6 +41,11 @@ pub enum Stmt {
         name: Token,
         initializer: Expr,
     },
+    FunDecl {
+        name: Token,
+        parameters: Vec<Token>,
+        statements: Box<Stmt>,
+    },
     Block(Vec<Stmt>),
     Conditional {
         condition: Expr,
@@ -122,6 +127,34 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
             let initializer = expression(tokens)?;
             Stmt::VarDecl { name, initializer }
         }
+        TokenType::FUN => {
+            tokens.next();
+            let name = tokens.next().expect("Unexpected EOF!");
+            if name.type_ != TokenType::IDENTIFIER {
+                return Err(ParseError::UnexpectedToken(name));
+            }
+            consume_token(tokens, TokenType::LEFT_PAREN)?;
+            let mut parameters: Vec<Token> = Vec::new();
+            while let Some(param) = tokens.next() {
+                match param.type_ {
+                    TokenType::IDENTIFIER => parameters.push(param),
+                    TokenType::COMMA => continue,
+                    TokenType::RIGHT_PAREN => break,
+                    _ => return Err(ParseError::UnexpectedToken(param)),
+                }
+            }
+            let statements = statement(tokens)?;
+            match statements {
+                Stmt::Block(_) => {}
+                _ => return Err(ParseError::InvalidStatement(statements)),
+            }
+
+            Stmt::FunDecl {
+                name,
+                parameters,
+                statements: Box::new(statements),
+            }
+        }
         _ => statement(tokens)?,
     };
 
@@ -129,6 +162,7 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
         Stmt::Block(_) => Ok(decl),
         Stmt::Conditional { .. } => Ok(decl),
         Stmt::WhileLoop { .. } => Ok(decl),
+        Stmt::FunDecl { .. } => Ok(decl),
         _ => {
             let lookahead = tokens.peek().expect("Unexpected EOF!");
             match lookahead.type_ {
@@ -772,6 +806,20 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_func_decl_0_arg() {
+        let mut token_iter = token_iter("fun some_func() {}");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::FunDecl {
+                name: Token::identifier("some_func".to_string()),
+                parameters: vec![],
+                statements: Box::new(Stmt::Block(vec![])),
+            })
+        );
+    }
+
     #[test]
     fn test_func_call_1_arg() {
         let mut token_iter = token_iter("some_func(x);");
@@ -784,6 +832,37 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_func_decl_1_arg() {
+        let mut token_iter = token_iter("fun some_func(x) {}");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::FunDecl {
+                name: Token::identifier("some_func".to_string()),
+                parameters: vec![Token::identifier("x".to_string())],
+                statements: Box::new(Stmt::Block(vec![])),
+            })
+        );
+    }
+
+    #[test]
+    fn test_func_decl_3_arg() {
+        let mut token_iter = token_iter("fun some_func(x,y,z,) {}");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::FunDecl {
+                name: Token::identifier("some_func".to_string()),
+                parameters: vec![
+                    Token::identifier("x".to_string()),
+                    Token::identifier("y".to_string()),
+                    Token::identifier("z".to_string()),
+                ],
+                statements: Box::new(Stmt::Block(vec![])),
+            })
+        );
+    }
+
     #[test]
     fn test_func_call_3_args() {
         let mut token_iter = token_iter("some_func(x, y,z);");
