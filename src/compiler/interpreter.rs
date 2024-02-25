@@ -23,6 +23,7 @@ pub enum RuntimeError {
         right: LoxObject,
     },
     NameError(Token),
+    Break,
     NotImplemented,
 }
 
@@ -72,7 +73,6 @@ impl Interpreter {
     }
 
     fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
-        // dbg!(&self.env, &stmt);
         match &stmt {
             Stmt::Print(expr) => {
                 let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
@@ -121,10 +121,17 @@ impl Interpreter {
                 statements,
             } => {
                 while is_truthy(&self.evaluate(condition)?) {
-                    self.execute_stmt(statements)?;
+                    match self.execute_stmt(statements) {
+                        Ok(()) => {}
+                        Err(err) => match err {
+                            RuntimeError::Break => break,
+                            _ => return Err(err),
+                        },
+                    }
                 }
                 Ok(())
             }
+            Stmt::Break => Err(RuntimeError::Break),
         }
     }
 
@@ -873,6 +880,14 @@ mod tests {
     fn test_for_no_incr() {
         test_output(
             "for (var a = 0; a < 5;) { a = a + 1; print a; }",
+            "1\n2\n3\n4\n5\n",
+        );
+    }
+
+    #[test]
+    fn test_for_with_break() {
+        test_output(
+            "for (var a = 0; ;) { if (a >= 5) break; a = a + 1; print a; }",
             "1\n2\n3\n4\n5\n",
         );
     }

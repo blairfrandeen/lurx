@@ -82,6 +82,7 @@ impl ErrorReport for interpreter::RuntimeError {
                 );
                 show_error_token(&name, &source);
             }
+            interpreter::RuntimeError::Break => println!("Break statement found outside of loop!"),
         }
     }
 }
