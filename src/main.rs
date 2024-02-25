@@ -18,6 +18,10 @@ struct Args {
     /// Execute code directly from the command line
     #[clap(short, long)]
     code: Option<String>,
+
+    /// Print the AST
+    #[clap(long, action)]
+    ast: bool,
 }
 
 fn main() {
@@ -26,16 +30,16 @@ fn main() {
     let mut interp = interpreter::Interpreter::new();
     if let Some(source_file) = args.source_path {
         source = fs::read_to_string(source_file).unwrap();
-        execute(&source, &mut interp);
+        execute(&source, &mut interp, args.ast);
     } else if let Some(source_code) = args.code {
         source = source_code;
-        execute(&source, &mut interp);
+        execute(&source, &mut interp, args.ast);
     } else {
         let _ = repl();
     }
 }
 
-fn execute(source: &String, interp: &mut interpreter::Interpreter) {
+fn execute(source: &String, interp: &mut interpreter::Interpreter, show_ast: bool) {
     let tokens = match lexer::scan_source(&source) {
         Ok(ref toks) => toks.clone(),
         Err(ref scan_err) => {
@@ -45,7 +49,9 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter) {
     };
 
     let program = parser::program(tokens, source.clone());
-    // dbg!(&program);
+    if show_ast {
+        dbg!(&program);
+    }
     if program.errors.is_empty() {
         interp.run(&program);
         interp.flush();
@@ -67,7 +73,7 @@ fn repl() -> rustyline::Result<()> {
                 if line == "quit".to_string() {
                     break;
                 } else {
-                    execute(&line, &mut interp)
+                    execute(&line, &mut interp, false)
                 }
             }
             Err(err) => match err {
