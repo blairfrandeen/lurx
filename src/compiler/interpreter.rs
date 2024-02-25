@@ -892,6 +892,11 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_dangling_else() {
+        test_output("if (true) if (false) print 0; else print 1;", "1\n");
+    }
+
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
