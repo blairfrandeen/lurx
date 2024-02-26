@@ -57,6 +57,7 @@ pub enum Stmt {
         statements: Box<Stmt>,
     },
     Break,
+    Return(Expr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -276,6 +277,10 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
         TokenType::BREAK => {
             tokens.next();
             Stmt::Break
+        }
+        TokenType::RETURN => {
+            tokens.next();
+            Stmt::Return(expression(tokens)?)
         }
         _ => Stmt::Expression(expression(tokens)?),
     };

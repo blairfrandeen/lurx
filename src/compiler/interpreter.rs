@@ -24,6 +24,7 @@ pub enum RuntimeError {
     },
     NameError(Token),
     Break,
+    Return(Expr),
     NotImplemented,
 }
 
@@ -169,6 +170,7 @@ impl Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Break),
+            Stmt::Return(expr) => Err(RuntimeError::Return(expr.clone())),
         }
     }
 
