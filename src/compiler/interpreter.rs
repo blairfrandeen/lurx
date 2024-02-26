@@ -1,7 +1,7 @@
 use crate::compiler::environment::Environment;
 use crate::compiler::errors::ErrorReport;
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::object::{LoxCallable, LoxObject, LoxValue};
+use crate::compiler::object::{LoxObject, LoxValue};
 use crate::compiler::parser::{Expr, Program, Stmt};
 
 use std::io::Write;
@@ -98,6 +98,32 @@ impl Interpreter {
                     self.env.update(name, self.evaluate(value)?)?;
                     Ok(())
                 }
+                Expr::Call {
+                    callee,
+                    arguments,
+                    paren: _,
+                } => {
+                    let callee_obj = self.evaluate(callee)?;
+                    let callable = match callee_obj.value {
+                        LoxValue::Callable(clbe) => clbe,
+                        _ => panic!("{:?} is not callable!", callee_obj),
+                        // TODO: Runtime error if not callable
+                    };
+
+                    if arguments.len() as u8 != callable.arity {
+                        panic!("Incorrect number of arguments!");
+                        // TODO: Runtime error for incorrect # of args
+                    }
+                    self.env = Environment::enclosed(self.env.clone());
+                    for arg in std::iter::zip(callable.parameters, arguments) {
+                        // TODO: Consider evaluating all arguments individually
+                        // BEFORE setting them in the environment?
+                        self.env.set(&arg.0, self.evaluate(arg.1)?);
+                    }
+                    self.execute_stmt(&callable.statements)?;
+                    self.env = self.env.enclosing();
+                    Ok(())
+                }
                 _ => {
                     if self.print_expr {
                         let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
@@ -163,7 +189,9 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_logical(left, operator, right),
-            Expr::Call { .. } => todo!(),
+            Expr::Call { .. } => {
+                todo!()
+            }
         }
     }
 
@@ -907,6 +935,11 @@ mod tests {
     #[test]
     fn test_dangling_else() {
         test_output("if (true) if (false) print 0; else print 1;", "1\n");
+    }
+
+    #[test]
+    fn test_basic_func_call() {
+        test_output("fun add(a,b) { print (a+b); } add(1,2);", "3\n");
     }
 
     fn test_output(source: &str, expected: &str) {
