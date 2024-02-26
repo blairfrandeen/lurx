@@ -33,7 +33,7 @@ pub struct Program {
     pub source: String,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
@@ -59,7 +59,7 @@ pub enum Stmt {
     Break,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Token),
     Unary {

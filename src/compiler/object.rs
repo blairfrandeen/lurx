@@ -1,4 +1,7 @@
+use crate::compiler::lexer::Token;
+use crate::compiler::parser::Stmt;
 use crate::compiler::LoxFloat;
+
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -13,6 +16,30 @@ pub enum LoxValue {
     True,
     False,
     Nil,
+    Callable(LoxCallable),
+}
+
+#[allow(unused)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct LoxCallable {
+    arity: u8,
+    name: Token,
+    parameters: Vec<Token>,
+    statements: Stmt,
+}
+
+#[allow(unused)]
+impl LoxObject {
+    pub fn callable(name: Token, parameters: Vec<Token>, statements: Stmt) -> Self {
+        let arity = parameters.len() as u8; // TODO: Check for too many params
+        let value = LoxValue::Callable(LoxCallable {
+            arity,
+            name,
+            parameters,
+            statements,
+        });
+        LoxObject { value }
+    }
 }
 
 impl PartialOrd for LoxValue {
@@ -77,6 +104,7 @@ impl Display for LoxValue {
             LoxValue::True => write!(f, "True")?,
             LoxValue::False => write!(f, "False")?,
             LoxValue::Nil => write!(f, "Nil")?,
+            LoxValue::Callable(callable) => write!(f, "<function {}>", callable.name)?,
         }
         Ok(())
     }

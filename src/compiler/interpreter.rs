@@ -1,7 +1,7 @@
 use crate::compiler::environment::Environment;
 use crate::compiler::errors::ErrorReport;
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::object::{LoxObject, LoxValue};
+use crate::compiler::object::{LoxCallable, LoxObject, LoxValue};
 use crate::compiler::parser::{Expr, Program, Stmt};
 
 use std::io::Write;
@@ -82,7 +82,17 @@ impl Interpreter {
                 self.env.set(name, self.evaluate(initializer)?);
                 Ok(())
             }
-            Stmt::FunDecl { .. } => todo!(),
+            Stmt::FunDecl {
+                name,
+                parameters,
+                statements,
+            } => {
+                self.env.set(
+                    name,
+                    LoxObject::callable(name.clone(), parameters.clone(), *statements.clone()),
+                );
+                Ok(())
+            }
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
                     self.env.update(name, self.evaluate(value)?)?;
