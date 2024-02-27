@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::compiler::interpreter::RuntimeError;
@@ -6,14 +7,14 @@ use crate::compiler::object::LoxObject;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    data: HashMap<String, LoxObject>,
-    enclosing: Option<Box<Environment>>,
+    data: RefCell<HashMap<String, LoxObject>>,
+    pub enclosing: Option<Box<Environment>>,
 }
 
 impl Environment {
-    pub fn get(&self, name: &Token) -> Result<&LoxObject, RuntimeError> {
-        match &self.data.get(&Self::get_ident(&name)) {
-            Some(obj) => Ok(*obj),
+    pub fn get(&self, name: &Token) -> Result<LoxObject, RuntimeError> {
+        match self.data.borrow().get(&Self::get_ident(&name)) {
+            Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
                 Some(enc) => enc.get(&name),
                 None => Err(RuntimeError::NameError(name.clone())),
@@ -21,17 +22,18 @@ impl Environment {
         }
     }
 
-    pub fn set(&mut self, name: &Token, value: LoxObject) {
-        let _ = &self.data.insert(Self::get_ident(&name), value);
+    pub fn set(&self, name: &Token, value: LoxObject) {
+        let _ = &self.data.borrow_mut().insert(Self::get_ident(&name), value);
     }
 
-    pub fn update(&mut self, name: &Token, value: LoxObject) -> Result<(), RuntimeError> {
-        match &self.data.contains_key(&Self::get_ident(&name)) {
+    pub fn update(&self, name: &Token, value: LoxObject) -> Result<(), RuntimeError> {
+        let has_key = &self.data.borrow().contains_key(&Self::get_ident(&name));
+        match has_key {
             true => {
-                let _ = &self.data.insert(Self::get_ident(&name), value);
+                let _ = &self.data.borrow_mut().insert(Self::get_ident(&name), value);
                 Ok(())
             }
-            false => match self.enclosing.as_deref_mut() {
+            false => match &self.enclosing {
                 Some(enc) => enc.update(name, value),
                 None => Err(RuntimeError::NameError(name.clone())),
             },
@@ -40,21 +42,24 @@ impl Environment {
 
     pub fn new() -> Self {
         Environment {
-            data: HashMap::new(),
+            data: HashMap::new().into(),
             enclosing: None,
         }
     }
 
-    pub fn enclosed(enclosing: Environment) -> Self {
+    pub fn enclosed(self) -> Self {
         Environment {
-            data: HashMap::new(),
-            enclosing: Some(Box::new(enclosing)),
+            data: HashMap::new().into(),
+            enclosing: Some(Box::new(self)),
         }
     }
 
-    pub fn enclosing(&self) -> Self {
-        *self.enclosing.clone().unwrap()
-    }
+    // pub fn enclosing(&self) -> Option<Self> {
+    //     match &self.enclosing {
+    //         Some(enc) => Some(*enc),
+    //         None => None,
+    //     }
+    // }
 
     fn get_ident(name: &Token) -> String {
         match name
@@ -85,11 +90,11 @@ mod tests {
         let mut local_data = HashMap::new();
         local_data.insert("b".to_string(), var_b);
         let global = Environment {
-            data: global_data,
+            data: global_data.into(),
             enclosing: None,
         };
         let local = Environment {
-            data: local_data,
+            data: local_data.into(),
             enclosing: Some(Box::new(global)),
         };
 
@@ -103,7 +108,7 @@ mod tests {
         let expected = LoxObject {
             value: LoxValue::True,
         };
-        assert_eq!(local.get(&target), Ok(&expected));
+        assert_eq!(local.get(&target), Ok(expected));
     }
 
     #[test]
@@ -113,7 +118,7 @@ mod tests {
         let expected = LoxObject {
             value: LoxValue::Number(7.0),
         };
-        assert_eq!(local.get(&target), Ok(&expected));
+        assert_eq!(local.get(&target), Ok(expected));
     }
 
     #[test]
@@ -125,23 +130,23 @@ mod tests {
 
     #[test]
     fn test_set() {
-        let mut local = env_fixture();
+        let local = env_fixture();
         let c_value = LoxObject {
             value: LoxValue::Number(3.0),
         };
         let c_token = Token::identifier("c".to_string());
         local.set(&c_token, c_value.clone());
-        assert_eq!(local.get(&c_token), Ok(&c_value));
+        assert_eq!(local.get(&c_token), Ok(c_value));
     }
 
     #[test]
     fn test_scope() {
-        let mut local = env_fixture();
+        let local = env_fixture();
         let a_value = LoxObject {
             value: LoxValue::Number(3.0),
         };
         let a_token = Token::identifier("a".to_string());
         local.set(&a_token, a_value.clone());
-        assert_eq!(local.get(&a_token), Ok(&a_value));
+        assert_eq!(local.get(&a_token), Ok(a_value));
     }
 }

@@ -115,14 +115,21 @@ impl Interpreter {
                         panic!("Incorrect number of arguments!");
                         // TODO: Runtime error for incorrect # of args
                     }
-                    self.env = Environment::enclosed(self.env.clone());
+                    // self.env = Environment::enclosed(self.env.clone());
+                    let env = self.env.clone();
+                    self.env = env.enclosed();
                     for arg in std::iter::zip(callable.parameters, arguments) {
                         // TODO: Consider evaluating all arguments individually
                         // BEFORE setting them in the environment?
                         self.env.set(&arg.0, self.evaluate(arg.1)?);
                     }
                     self.execute_stmt(&callable.statements)?;
-                    self.env = self.env.enclosing();
+                    // self.env = self.env.enclosing().expect("Expect enclosing environment!");
+                    self.env = *self
+                        .env
+                        .enclosing
+                        .clone()
+                        .expect("Expect enclosing environment!");
                     Ok(())
                 }
                 _ => {
@@ -133,11 +140,18 @@ impl Interpreter {
                 }
             },
             Stmt::Block(stmts) => {
-                self.env = Environment::enclosed(self.env.clone());
+                // self.env = Environment::enclosed(self.env.clone());
+                let env = self.env.clone();
+                self.env = env.enclosed();
                 for stmt in stmts.into_iter() {
                     self.execute_stmt(stmt)?;
                 }
-                self.env = self.env.enclosing();
+                // self.env = self.env.enclosing().expect("Expect enclosing environment!");
+                self.env = *self
+                    .env
+                    .enclosing
+                    .clone()
+                    .expect("Expect enclosing environment!");
                 Ok(())
             }
             Stmt::Conditional {
@@ -336,7 +350,7 @@ impl Interpreter {
 
     fn eval_literal(&self, token: &Token) -> Result<LoxObject, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => self.env.get(&token).cloned(),
+            TokenType::IDENTIFIER => self.env.get(&token),
             _ => Ok(LoxObject {
                 value: token.value(),
             }),
