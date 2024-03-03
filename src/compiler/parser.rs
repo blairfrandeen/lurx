@@ -39,7 +39,7 @@ pub enum Stmt {
     Print(Expr),
     VarDecl {
         name: Token,
-        initializer: Expr,
+        initializer: Option<Expr>,
     },
     FunDecl {
         name: Token,
@@ -124,8 +124,15 @@ fn declaration(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stm
             let name = consume_token(tokens, TokenType::IDENTIFIER)?;
             // TODO: Allow variables to be declared without initializers
             // See issue #7
-            consume_token(tokens, TokenType::EQUAL)?;
-            let initializer = expression(tokens)?;
+            let lookahed = tokens.peek().expect("Unexpected EOF!");
+            let initializer = match lookahed.type_ {
+                TokenType::SEMICOLON => None,
+                _ => {
+                    consume_token(tokens, TokenType::EQUAL)?;
+                    Some(expression(tokens)?)
+                }
+            };
+
             Stmt::VarDecl { name, initializer }
         }
         TokenType::FUN => {
@@ -724,7 +731,7 @@ mod tests {
             declaration(&mut token_iter),
             Ok(Stmt::VarDecl {
                 name: Token::identifier("a".to_string()),
-                initializer: Expr::Literal(Token::numlit(7.0))
+                initializer: Some(Expr::Literal(Token::numlit(7.0)))
             })
         );
     }
@@ -883,5 +890,17 @@ mod tests {
                 paren: Token::from_type(TokenType::RIGHT_PAREN),
             })
         );
+    }
+
+    #[test]
+    fn test_nil_decl() {
+        let mut token_iter = token_iter("var a;");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::VarDecl {
+                name: Token::identifier("a".to_string()),
+                initializer: None
+            })
+        )
     }
 }

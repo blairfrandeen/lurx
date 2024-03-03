@@ -80,7 +80,15 @@ impl Interpreter {
                 Ok(())
             }
             Stmt::VarDecl { name, initializer } => {
-                self.env.set(name, self.evaluate(initializer)?);
+                match initializer {
+                    Some(init) => self.env.set(name, self.evaluate(init)?),
+                    None => self.env.set(
+                        name,
+                        LoxObject {
+                            value: LoxValue::Nil,
+                        },
+                    ),
+                }
                 Ok(())
             }
             Stmt::FunDecl {
@@ -838,6 +846,21 @@ mod tests {
             result,
             Ok(LoxObject {
                 value: LoxValue::False
+            })
+        )
+    }
+
+    #[test]
+    fn test_nil_var_decl() {
+        let mut token_iter = token_iter("var a;").collect();
+        let mut interp = Interpreter::new();
+        let prgm = parser::program(token_iter, "var a;".to_string());
+        let _ = interp.run(&prgm);
+        let atok = Token::identifier("a".to_string());
+        assert_eq!(
+            interp.env.get(&atok),
+            Ok(LoxObject {
+                value: LoxValue::Nil
             })
         )
     }
