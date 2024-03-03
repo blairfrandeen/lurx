@@ -905,31 +905,38 @@ mod tests {
     }
 
     #[test]
-    fn test_conditionals() {
+    fn test_cond_true() {
         // most basic conditional
-        test_output("if true print 1;", "1\n");
-
+        test_output("if (true) print 1;", "1\n");
+    }
+    #[test]
+    fn test_cond_false() {
         // else statement
-        test_output("if false print 2; else print 1;", "1\n");
-
+        test_output("if (false) print 2; else print 1;", "1\n");
         // with braces
-        test_output("if false { print 2; } else print 1;", "1\n");
+        test_output("if (false) { print 2; } else print 1;", "1\n");
+    }
 
+    #[test]
+    fn test_cond_assignment() {
         // some assignment and more complex cases
         test_output(
-            "var a = 0; if 5*5==26 { a = 2; } else { a = 1; } print a;",
+            "var a = 0; if (5*5==26) { a = 2; } else { a = 1; } print a;",
             "1\n",
         );
+    }
 
+    #[test]
+    fn test_cond_assignment_2() {
         // else if
         test_output(
-            "var a = 0; var b = 5; if b*5==26 { a = 2; } else if b == 5 { a = 1; } else { a = 4; } print a;",
+            "var a = 0; var b = 5; if (b*5==26) { a = 2; } else if (b == 5) { a = 1; } else { a = 4; } print a;",
             "1\n",
         );
 
         // nesting
         test_output(
-            "if true { if true { if false { print 2; } else { print 1; } } }",
+            "if (true) { if (true) { if (false) { print 2; } else { print 1; } } }",
             "1\n",
         );
     }

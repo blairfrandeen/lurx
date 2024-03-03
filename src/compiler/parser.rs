@@ -216,7 +216,9 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
         }
         TokenType::IF => {
             tokens.next();
+            consume_token(tokens, TokenType::LEFT_PAREN)?;
             let condition = expression(tokens)?;
+            consume_token(tokens, TokenType::RIGHT_PAREN)?;
             let true_branch = Box::new(declaration(tokens)?);
             let next_token = tokens.peek().expect("Unexpected EOF!");
             let false_branch = match next_token.type_ {
@@ -234,7 +236,9 @@ fn statement(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Stmt,
         }
         TokenType::WHILE => {
             tokens.next();
+            consume_token(tokens, TokenType::LEFT_PAREN)?;
             let condition = expression(tokens)?;
+            consume_token(tokens, TokenType::RIGHT_PAREN)?;
             let statements = Box::new(declaration(tokens)?);
             Stmt::WhileLoop {
                 condition,
@@ -475,7 +479,6 @@ fn primary(tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Expr, P
         Err(ParseError::UnclosedParenthesis(next_token.clone()))
     } else {
         let next_token = tokens.next().expect("Unexpected EOF!");
-        println!("hi!");
         Err(ParseError::NotImplemented(next_token.clone()))
     }
 }
@@ -900,6 +903,36 @@ mod tests {
             Ok(Stmt::VarDecl {
                 name: Token::identifier("a".to_string()),
                 initializer: None
+            })
+        )
+    }
+
+    #[test]
+    fn test_if_decl() {
+        let mut token_iter = token_iter("if (true) print 1;");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::Conditional {
+                condition: Expr::Literal(Token::from_type(TokenType::TRUE)),
+                true_branch: Box::new(Stmt::Print(Expr::Literal(Token::numlit(1.0)))),
+                false_branch: None,
+            })
+        )
+    }
+
+    #[test]
+    fn test_if_else_decl() {
+        let mut token_iter = token_iter("if (true) { print 1;} else { print 0; }");
+        assert_eq!(
+            declaration(&mut token_iter),
+            Ok(Stmt::Conditional {
+                condition: Expr::Literal(Token::from_type(TokenType::TRUE)),
+                true_branch: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Literal(
+                    Token::numlit(1.0)
+                ))])),
+                false_branch: Some(Box::new(Stmt::Block(vec![Stmt::Print(Expr::Literal(
+                    Token::numlit(0.0)
+                ))]))),
             })
         )
     }
