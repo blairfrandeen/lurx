@@ -23,7 +23,7 @@ pub enum LoxValue {
 #[derive(Debug, PartialEq, Clone)]
 pub struct LoxCallable {
     pub arity: u8,
-    name: Token,
+    pub name: Token,
     pub parameters: Vec<Token>,
     pub statements: Stmt,
 }
