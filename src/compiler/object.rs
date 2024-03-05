@@ -4,11 +4,6 @@ use crate::compiler::LoxFloat;
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct LoxObject {
-    pub value: LoxValue,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum LoxValue {
     StrLit(String),
@@ -28,17 +23,15 @@ pub struct LoxCallable {
     pub statements: Stmt,
 }
 
-#[allow(unused)]
-impl LoxObject {
+impl LoxValue {
     pub fn callable(name: Token, parameters: Vec<Token>, statements: Stmt) -> Self {
         let arity = parameters.len() as u8; // TODO: Check for too many params
-        let value = LoxValue::Callable(LoxCallable {
+        LoxValue::Callable(LoxCallable {
             arity,
             name,
             parameters,
             statements,
-        });
-        LoxObject { value }
+        })
     }
 }
 
@@ -56,43 +49,37 @@ impl PartialOrd for LoxValue {
     }
 }
 
-impl LoxObject {
+impl LoxValue {
     pub fn is_number(&self) -> bool {
-        match &self.value {
+        match &self {
             LoxValue::Number(_) => true,
             _ => false,
         }
     }
     pub fn number(&self) -> Option<LoxFloat> {
-        match &self.value {
+        match &self {
             LoxValue::Number(n) => Some(*n),
             _ => None,
         }
     }
     pub fn is_str(&self) -> bool {
-        match &self.value {
+        match &self {
             LoxValue::StrLit(_) => true,
             _ => false,
         }
     }
     pub fn strlit(&self) -> Option<&String> {
-        match &self.value {
+        match &self {
             LoxValue::StrLit(s) => Some(s),
             _ => None,
         }
     }
     pub fn is_bool(&self) -> bool {
-        match &self.value {
+        match &self {
             LoxValue::True => true,
             LoxValue::False => true,
             _ => false,
         }
-    }
-}
-
-impl Display for LoxObject {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
     }
 }
 

@@ -1,27 +1,30 @@
 use crate::compiler::builtins::builtins;
 use crate::compiler::environment::Environment;
 use crate::compiler::errors::ErrorReport;
+use crate::compiler::function::Callable;
 use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::object::{LoxObject, LoxValue};
+use crate::compiler::object::LoxValue;
 use crate::compiler::parser::{Expr, Program, Stmt};
 
+use std::cell::RefCell;
 use std::io::Write;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
     InvalidOperand {
         operator: Token,
-        operand: LoxObject,
+        operand: LoxValue,
     },
     ZeroDivision {
-        left: LoxObject,
+        left: LoxValue,
         operator: Token,
-        right: LoxObject,
+        right: LoxValue,
     },
     TypeError {
-        left: LoxObject,
+        left: LoxValue,
         operator: Token,
-        right: LoxObject,
+        right: LoxValue,
     },
     NameError(Token),
     Break,
@@ -80,7 +83,7 @@ impl Interpreter {
         self.print_expr = print_expr;
     }
 
-    fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    pub fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
                 let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
@@ -89,12 +92,7 @@ impl Interpreter {
             Stmt::VarDecl { name, initializer } => {
                 match initializer {
                     Some(init) => self.globals.set(name, self.evaluate(init)?),
-                    None => self.globals.set(
-                        name,
-                        LoxObject {
-                            value: LoxValue::Nil,
-                        },
-                    ),
+                    None => self.globals.set(name, LoxValue::Nil),
                 }
                 Ok(())
             }
@@ -105,7 +103,7 @@ impl Interpreter {
             } => {
                 self.globals.set(
                     name,
-                    LoxObject::callable(name.clone(), parameters.clone(), *statements.clone()),
+                    LoxValue::callable(name.clone(), parameters.clone(), *statements.clone()),
                 );
                 Ok(())
             }
@@ -120,7 +118,7 @@ impl Interpreter {
                     paren: _,
                 } => {
                     let callee_obj = self.evaluate(callee)?;
-                    let callable = match callee_obj.value {
+                    let callable = match callee_obj {
                         LoxValue::Callable(clbe) => clbe,
                         _ => panic!("{:?} is not callable!", callee_obj),
                         // TODO: Runtime error if not callable
@@ -203,7 +201,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<LoxObject, RuntimeError> {
+    fn evaluate(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         match &expr {
             Expr::Unary { operator, right } => self.eval_unary(operator, right),
             Expr::Binary {
@@ -231,7 +229,7 @@ impl Interpreter {
         left: &Expr,
         operator: &Token,
         right: &Expr,
-    ) -> Result<LoxObject, RuntimeError> {
+    ) -> Result<LoxValue, RuntimeError> {
         let right = self.evaluate(right)?;
         let left = self.evaluate(left)?;
         let result = match operator.type_ {
@@ -243,7 +241,7 @@ impl Interpreter {
             true => LoxValue::True,
             false => LoxValue::False,
         };
-        Ok(LoxObject { value })
+        Ok(value)
     }
 
     fn eval_binary(
@@ -251,7 +249,7 @@ impl Interpreter {
         left: &Expr,
         operator: &Token,
         right: &Expr,
-    ) -> Result<LoxObject, RuntimeError> {
+    ) -> Result<LoxValue, RuntimeError> {
         let right = self.evaluate(right)?;
         let left = self.evaluate(left)?;
 
@@ -328,17 +326,17 @@ impl Interpreter {
             TokenType::BANG_EQUAL => compare_lox_value(&left, &operator, &right)?,
             _ => return Err(RuntimeError::NotImplemented),
         };
-        Ok(LoxObject { value })
+        Ok(value)
     }
 
-    fn eval_grouping(&self, expr: &Expr) -> Result<LoxObject, RuntimeError> {
+    fn eval_grouping(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         self.evaluate(expr)
     }
 
-    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<LoxObject, RuntimeError> {
+    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<LoxValue, RuntimeError> {
         let mut right = self.evaluate(right)?;
-        right.value = match operator.type_ {
-            TokenType::BANG => match right.value {
+        right = match operator.type_ {
+            TokenType::BANG => match right {
                 LoxValue::True => LoxValue::False,
                 LoxValue::False => LoxValue::True,
                 LoxValue::Nil => LoxValue::True,
@@ -349,7 +347,7 @@ impl Interpreter {
                     })
                 }
             },
-            TokenType::MINUS => match right.value {
+            TokenType::MINUS => match right {
                 LoxValue::Number(n) => LoxValue::Number(-n),
                 _ => {
                     return Err(RuntimeError::InvalidOperand {
@@ -363,18 +361,16 @@ impl Interpreter {
         Ok(right)
     }
 
-    fn eval_literal(&self, token: &Token) -> Result<LoxObject, RuntimeError> {
+    fn eval_literal(&self, token: &Token) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
             TokenType::IDENTIFIER => self.globals.get(&token),
-            _ => Ok(LoxObject {
-                value: token.value(),
-            }),
+            _ => Ok(token.value()),
         }
     }
 }
 
-fn is_truthy(obj: &LoxObject) -> bool {
-    match &obj.value {
+fn is_truthy(obj: &LoxValue) -> bool {
+    match &obj {
         LoxValue::False => false,
         LoxValue::Nil => false,
         _ => true,
@@ -382,9 +378,9 @@ fn is_truthy(obj: &LoxObject) -> bool {
 }
 
 fn compare_lox_value(
-    left: &LoxObject,
+    left: &LoxValue,
     operator: &Token,
-    right: &LoxObject,
+    right: &LoxValue,
 ) -> Result<LoxValue, RuntimeError> {
     let result: bool;
     if right.is_number() & left.is_number() {
@@ -457,19 +453,9 @@ mod tests {
         let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
         let mut interp = Interpreter::new();
         let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::OR), &false_exp);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::True
-            })
-        );
+        assert_eq!(result, Ok(LoxValue::True));
         let result = interp.eval_logical(&false_exp, &Token::from_type(TokenType::OR), &false_exp);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::False
-            })
-        );
+        assert_eq!(result, Ok(LoxValue::False));
     }
     #[test]
     fn test_logical_and() {
@@ -477,19 +463,9 @@ mod tests {
         let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
         let mut interp = Interpreter::new();
         let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &true_exp);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::True
-            })
-        );
+        assert_eq!(result, Ok(LoxValue::True));
         let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &false_exp);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::False
-            })
-        );
+        assert_eq!(result, Ok(LoxValue::False));
     }
 
     #[test]
@@ -498,7 +474,7 @@ mod tests {
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
         let eval = interp.evaluate(&un).unwrap();
-        assert_eq!(eval.value, LoxValue::False);
+        assert_eq!(eval, LoxValue::False);
     }
     #[test]
     fn test_eval_unary_not_false() {
@@ -506,7 +482,7 @@ mod tests {
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
         let eval = interp.evaluate(&un).unwrap();
-        assert_eq!(eval.value, LoxValue::True);
+        assert_eq!(eval, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_not_nil() {
@@ -514,7 +490,7 @@ mod tests {
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
         let eval = interp.evaluate(&un).unwrap();
-        assert_eq!(eval.value, LoxValue::True);
+        assert_eq!(eval, LoxValue::True);
     }
     #[test]
     fn test_eval_unary_minus() {
@@ -522,7 +498,7 @@ mod tests {
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
         let eval = interp.evaluate(&un).unwrap();
-        assert_eq!(eval.value, LoxValue::Number(-2.0));
+        assert_eq!(eval, LoxValue::Number(-2.0));
     }
 
     #[test]
@@ -535,9 +511,7 @@ mod tests {
             eval,
             Err(RuntimeError::InvalidOperand {
                 operator: Token::from_type(TokenType::BANG),
-                operand: LoxObject {
-                    value: LoxValue::Number(2.0)
-                },
+                operand: LoxValue::Number(2.0),
             })
         );
     }
@@ -552,9 +526,7 @@ mod tests {
             eval,
             Err(RuntimeError::InvalidOperand {
                 operator: Token::from("-"),
-                operand: LoxObject {
-                    value: LoxValue::True
-                },
+                operand: LoxValue::True,
             })
         );
     }
@@ -568,13 +540,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::ZeroDivision {
-                left: LoxObject {
-                    value: LoxValue::Number(1.0),
-                },
+                left: LoxValue::Number(1.0),
                 operator: Token::from_type(TokenType::SLASH),
-                right: LoxObject {
-                    value: LoxValue::Number(0.0),
-                },
+                right: LoxValue::Number(0.0),
             })
         )
     }
@@ -588,13 +556,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::StrLit("anything".to_string())
-                },
+                left: LoxValue::StrLit("anything".to_string()),
                 operator: Token::from_type(TokenType::SLASH),
-                right: LoxObject {
-                    value: LoxValue::Number(0.0),
-                },
+                right: LoxValue::Number(0.0),
             })
         )
     }
@@ -605,12 +569,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::Number(49.0)
-            },)
-        )
+        assert_eq!(result, Ok(LoxValue::Number(49.0)))
     }
 
     #[test]
@@ -619,12 +578,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::Number(7.0)
-            },)
-        )
+        assert_eq!(result, Ok(LoxValue::Number(7.0)))
     }
 
     #[test]
@@ -636,13 +590,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::Number(-49.0),
-                },
+                left: LoxValue::Number(-49.0),
                 operator: Token::from_type(TokenType::SLASH),
-                right: LoxObject {
-                    value: LoxValue::StrLit("seven".to_string()),
-                },
+                right: LoxValue::StrLit("seven".to_string()),
             })
         );
         let mut token_iter_ = token_iter("true * nil");
@@ -651,13 +601,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::True,
-                },
+                left: LoxValue::True,
                 operator: Token::from_type(TokenType::STAR),
-                right: LoxObject {
-                    value: LoxValue::Nil,
-                },
+                right: LoxValue::Nil,
             })
         )
     }
@@ -671,13 +617,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::Number(-49.0),
-                },
+                left: LoxValue::Number(-49.0),
                 operator: Token::from_type(TokenType::PLUS),
-                right: LoxObject {
-                    value: LoxValue::True,
-                },
+                right: LoxValue::True,
             })
         )
     }
@@ -687,12 +629,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::Number(14.0)
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::Number(14.0)))
     }
     #[test]
     fn test_string_concat() {
@@ -700,12 +637,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::StrLit("Hello World!".to_string())
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::StrLit("Hello World!".to_string())))
     }
 
     #[test]
@@ -717,13 +649,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::StrLit("Hello ".to_string()),
-                },
+                left: LoxValue::StrLit("Hello ".to_string()),
                 operator: Token::from_type(TokenType::MINUS),
-                right: LoxObject {
-                    value: LoxValue::StrLit("World!".to_string()),
-                },
+                right: LoxValue::StrLit("World!".to_string()),
             })
         )
     }
@@ -734,12 +662,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::True
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::True))
     }
 
     #[test]
@@ -751,13 +674,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::Number(3.0),
-                },
+                left: LoxValue::Number(3.0),
                 operator: Token::from_type(TokenType::GREATER),
-                right: LoxObject {
-                    value: LoxValue::True,
-                },
+                right: LoxValue::True,
             })
         )
     }
@@ -767,12 +686,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::False
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::False))
     }
 
     #[test]
@@ -781,12 +695,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::True
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::True))
     }
 
     #[test]
@@ -795,12 +704,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::True
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::True))
     }
 
     #[test]
@@ -812,13 +716,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::StrLit("parrot".to_string()),
-                },
+                left: LoxValue::StrLit("parrot".to_string()),
                 operator: Token::from_type(TokenType::BANG_EQUAL),
-                right: LoxObject {
-                    value: LoxValue::Number(33.0),
-                },
+                right: LoxValue::Number(33.0),
             })
         )
     }
@@ -832,13 +732,9 @@ mod tests {
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
-                left: LoxObject {
-                    value: LoxValue::StrLit("coffee".to_string()),
-                },
+                left: LoxValue::StrLit("coffee".to_string()),
                 operator: Token::from_type(TokenType::LESS_EQUAL),
-                right: LoxObject {
-                    value: LoxValue::StrLit("tea".to_string()),
-                },
+                right: LoxValue::StrLit("tea".to_string()),
             })
         )
     }
@@ -849,12 +745,7 @@ mod tests {
         let mut interp = Interpreter::new();
         let expr = parser::expression(&mut token_iter).unwrap();
         let result = interp.evaluate(&expr);
-        assert_eq!(
-            result,
-            Ok(LoxObject {
-                value: LoxValue::False
-            })
-        )
+        assert_eq!(result, Ok(LoxValue::False))
     }
 
     #[test]
@@ -864,12 +755,7 @@ mod tests {
         let prgm = parser::program(token_iter, "var a;".to_string());
         let _ = interp.run(&prgm);
         let atok = Token::identifier("a".to_string());
-        assert_eq!(
-            interp.globals.get(&atok),
-            Ok(LoxObject {
-                value: LoxValue::Nil
-            })
-        )
+        assert_eq!(interp.globals.get(&atok), Ok(LoxValue::Nil))
     }
 
     #[test]
