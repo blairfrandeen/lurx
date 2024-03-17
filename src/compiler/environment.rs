@@ -29,7 +29,6 @@ impl Environment {
 
     pub fn update(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
         let has_key = &self.data.contains_key(&Self::get_ident(&name));
-        dbg!(&self);
         match has_key {
             true => {
                 let _ = &self.data.insert(Self::get_ident(&name), value);

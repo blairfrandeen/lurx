@@ -6,9 +6,9 @@ use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::object::LoxValue;
 use crate::compiler::parser::{Expr, Program, Stmt};
 
-// use std::cell::RefCell;
+use std::cell::RefCell;
 use std::io::Write;
-// use std::rc::Rc;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -34,8 +34,8 @@ pub enum RuntimeError {
 
 pub struct Interpreter {
     #[allow(dead_code)]
-    globals: Environment,
-    locals: Environment,
+    globals: Rc<RefCell<Environment>>,
+    locals: Rc<RefCell<Environment>>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -63,8 +63,8 @@ impl Interpreter {
             globals.set(&builtin_func.0, builtin_func.1);
         }
         Interpreter {
-            globals,
-            locals,
+            globals: Rc::new(RefCell::new(globals)),
+            locals: Rc::new(RefCell::new(locals)),
             out: vec![],
             flush: false,
             print_expr: false,
@@ -91,7 +91,7 @@ impl Interpreter {
         env: Environment,
     ) -> Result<(), RuntimeError> {
         let prev_env = self.locals.clone();
-        self.locals = env;
+        self.locals = Rc::new(RefCell::new(env));
         for stmt in stmts.iter() {
             self.execute_stmt(stmt)?;
         }
@@ -107,8 +107,8 @@ impl Interpreter {
             }
             Stmt::VarDecl { name, initializer } => {
                 match initializer {
-                    Some(init) => self.locals.set(name, self.evaluate(init)?),
-                    None => self.locals.set(name, LoxValue::Nil),
+                    Some(init) => self.locals.borrow_mut().set(name, self.evaluate(init)?),
+                    None => self.locals.borrow_mut().set(name, LoxValue::Nil),
                 }
                 Ok(())
             }
@@ -117,7 +117,7 @@ impl Interpreter {
                 parameters,
                 statements,
             } => {
-                self.locals.set(
+                self.locals.borrow_mut().set(
                     name,
                     LoxValue::callable(name.clone(), parameters.clone(), *statements.clone()),
                 );
@@ -125,7 +125,8 @@ impl Interpreter {
             }
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
-                    self.locals.update(name, self.evaluate(value)?)?;
+                    let assignment = self.evaluate(value)?;
+                    self.locals.borrow_mut().update(name, assignment)?;
                     Ok(())
                 }
                 Expr::Call {
@@ -144,7 +145,7 @@ impl Interpreter {
                         panic!("Incorrect number of arguments!");
                         // TODO: Runtime error for incorrect # of args
                     }
-                    let mut env = self.locals.clone().enclosed();
+                    let mut env = self.locals.borrow().clone().enclosed();
                     for arg in std::iter::zip(callable.parameters, arguments) {
                         // TODO: Consider evaluating all arguments individually
                         // BEFORE setting them in the environment?
@@ -161,7 +162,7 @@ impl Interpreter {
                 }
             },
             Stmt::Block(stmts) => {
-                let env = self.locals.clone().enclosed();
+                let env = self.locals.borrow().clone().enclosed();
                 self.execute_block(stmts.to_vec(), env)?;
                 Ok(())
             }
@@ -361,7 +362,7 @@ impl Interpreter {
 
     fn eval_literal(&self, token: &Token) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => self.locals.get(&token),
+            TokenType::IDENTIFIER => self.locals.borrow().get(&token),
             _ => Ok(token.value()),
         }
     }
@@ -753,7 +754,7 @@ mod tests {
         let prgm = parser::program(token_iter, "var a;".to_string());
         let _ = interp.run(&prgm);
         let atok = Token::identifier("a".to_string());
-        assert_eq!(interp.locals.get(&atok), Ok(LoxValue::Nil))
+        assert_eq!(interp.locals.borrow().get(&atok), Ok(LoxValue::Nil));
     }
 
     #[test]
