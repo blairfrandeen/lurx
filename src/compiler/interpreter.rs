@@ -901,6 +901,14 @@ mod tests {
         test_output("fun one() { return 1; } var a = one(); print a;", "1\n");
     }
 
+    #[test]
+    fn test_return_from_loop() {
+        test_output(
+            "fun loop5() { var a = 0; while (true) { if (a == 5) return 5; a = a + 1; }} print loop5();",
+            "5\n",
+        );
+    }
+
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
@@ -908,5 +916,39 @@ mod tests {
         interp.set_flush(false);
         interp.run(&program);
         assert_eq!(interp.out, expected.as_bytes());
+    }
+
+    #[test]
+    fn fun_call() {
+        test_fun_call(
+            "fun one() { return 1; }",
+            "one",
+            vec![],
+            Ok(LoxValue::Number(1.0)),
+        );
+    }
+
+    fn test_fun_call(
+        fn_decl: &str,
+        fn_name: &str,             // TODO: just parse this from fn_decl?
+        _arguments: Vec<LoxValue>, // TODO: wrap arguments as Expressions and use them
+        expected: Result<LoxValue, RuntimeError>,
+    ) {
+        let tokens = lexer::scan_source(&fn_decl.to_string()).unwrap();
+        let program = parser::program(tokens, fn_decl.to_string());
+        let mut interp = interpreter::Interpreter::new();
+        interp.set_flush(false);
+        interp.run(&program);
+        dbg!(&interp.locals);
+
+        let fn_call = Expr::Call {
+            callee: Box::new(Expr::Literal(Token::identifier(fn_name.to_string()))),
+            arguments: vec![],
+            paren: Token::from_type(TokenType::RIGHT_PAREN),
+        };
+
+        let result = interp.evaluate(&fn_call);
+
+        assert_eq!(result, expected);
     }
 }
