@@ -90,11 +90,11 @@ impl Interpreter {
         stmts: Vec<Stmt>,
         env: Environment,
     ) -> Result<(), RuntimeError> {
-        *self.locals.borrow_mut() = env.clone();
+        *self.locals.borrow_mut() = env;
         for stmt in stmts.iter() {
             self.execute_stmt(stmt)?;
         }
-        let enclosing = env.enclosing.unwrap();
+        let enclosing = self.locals.borrow().clone().enclosing.unwrap();
         self.locals = enclosing;
         Ok(())
     }
