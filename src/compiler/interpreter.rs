@@ -133,34 +133,9 @@ impl Interpreter {
                     self.locals.borrow_mut().update(name, assignment)?;
                     Ok(())
                 }
-                Expr::Call {
-                    callee,
-                    arguments,
-                    paren: _,
-                } => {
-                    let callee_obj = self.evaluate(callee)?;
-                    let callable = match callee_obj {
-                        LoxValue::Callable(clbe) => clbe,
-                        _ => panic!("{:?} is not callable!", callee_obj),
-                        // TODO: Runtime error if not callable
-                    };
-
-                    if arguments.len() as u8 != callable.arity {
-                        panic!("Incorrect number of arguments!");
-                        // TODO: Runtime error for incorrect # of args
-                    }
-                    let mut env = self.locals.borrow().clone().enclosed();
-                    for arg in std::iter::zip(callable.parameters, arguments) {
-                        // TODO: Consider evaluating all arguments individually
-                        // BEFORE setting them in the environment?
-                        env.set(&arg.0, self.evaluate(arg.1)?);
-                    }
-                    self.execute_block(vec![callable.statements], env)?;
-                    Ok(())
-                }
                 _ => {
+                    let output = self.evaluate(expr)?;
                     if self.print_expr {
-                        let output = self.evaluate(expr)?;
                         let _ = writeln!(self.out, "{}", output);
                     }
                     Ok(())
@@ -222,8 +197,38 @@ impl Interpreter {
                 operator,
                 right,
             } => self.eval_logical(left, operator, right),
-            Expr::Call { .. } => {
-                todo!()
+            Expr::Call {
+                callee,
+                arguments,
+                paren: _,
+            } => {
+                let callee_obj = self.evaluate(callee)?;
+                let callable = match callee_obj {
+                    LoxValue::Callable(clbe) => clbe,
+                    _ => panic!("{:?} is not callable!", callee_obj),
+                    // TODO: Runtime error if not callable
+                };
+
+                if arguments.len() as u8 != callable.arity {
+                    panic!("Incorrect number of arguments!");
+                    // TODO: Runtime error for incorrect # of args
+                }
+                let mut env = self.locals.borrow().clone().enclosed();
+                for arg in std::iter::zip(callable.parameters, arguments) {
+                    // TODO: Consider evaluating all arguments individually
+                    // BEFORE setting them in the environment?
+                    env.set(&arg.0, self.evaluate(arg.1)?);
+                }
+                match self.execute_block(vec![callable.statements], env) {
+                    Ok(_) => Ok(LoxValue::Nil),
+                    Err(err) => match err {
+                        RuntimeError::Return(expr) => {
+                            let retval = self.evaluate(&expr)?;
+                            Ok(retval)
+                        }
+                        _ => Err(err),
+                    },
+                }
             }
         }
     }
