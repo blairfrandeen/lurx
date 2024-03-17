@@ -1,14 +1,14 @@
 use crate::compiler::builtins::builtins;
 use crate::compiler::environment::Environment;
 use crate::compiler::errors::ErrorReport;
-use crate::compiler::function::Callable;
+// use crate::compiler::function::Callable;
 use crate::compiler::lexer::{Literal, Token, TokenType};
 use crate::compiler::object::LoxValue;
 use crate::compiler::parser::{Expr, Program, Stmt};
 
-use std::cell::RefCell;
+// use std::cell::RefCell;
 use std::io::Write;
-use std::rc::Rc;
+// use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -32,6 +32,7 @@ pub enum RuntimeError {
     NotImplemented,
 }
 
+#[allow(dead_code)]
 pub struct Interpreter {
     globals: Environment,
     env: Environment,
@@ -56,7 +57,7 @@ impl Interpreter {
     }
 
     pub fn new() -> Self {
-        let globals = Environment::new();
+        let mut globals = Environment::new();
         for builtin_func in builtins().into_iter() {
             globals.set(&builtin_func.0, builtin_func.1);
         }

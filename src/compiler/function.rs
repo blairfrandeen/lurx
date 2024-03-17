@@ -33,12 +33,12 @@ impl Callable {
     ) -> Result<LoxValue, RuntimeError> {
         match &self {
             Callable::Function {
-                arity,
-                name,
+                arity: _,
+                name: _,
                 parameters,
                 statements,
             } => {
-                let env = environment.enclosed();
+                let mut env = environment.enclosed();
                 for arg in std::iter::zip(parameters, args) {
                     env.set(&arg.0, arg.1);
                 }

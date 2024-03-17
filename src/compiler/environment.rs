@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::compiler::interpreter::RuntimeError;
@@ -7,13 +6,13 @@ use crate::compiler::object::LoxValue;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    data: RefCell<HashMap<String, LoxValue>>,
+    data: HashMap<String, LoxValue>,
     pub enclosing: Option<Box<Environment>>,
 }
 
 impl Environment {
     pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        match self.data.borrow().get(&Self::get_ident(&name)) {
+        match self.data.get(&Self::get_ident(&name)) {
             Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
                 Some(enc) => enc.get(&name),
@@ -22,18 +21,18 @@ impl Environment {
         }
     }
 
-    pub fn set(&self, name: &Token, value: LoxValue) {
-        let _ = &self.data.borrow_mut().insert(Self::get_ident(&name), value);
+    pub fn set(&mut self, name: &Token, value: LoxValue) {
+        let _ = &self.data.insert(Self::get_ident(&name), value);
     }
 
-    pub fn update(&self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
-        let has_key = &self.data.borrow().contains_key(&Self::get_ident(&name));
+    pub fn update(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
+        let has_key = &self.data.contains_key(&Self::get_ident(&name));
         match has_key {
             true => {
-                let _ = &self.data.borrow_mut().insert(Self::get_ident(&name), value);
+                let _ = &self.data.insert(Self::get_ident(&name), value);
                 Ok(())
             }
-            false => match &self.enclosing {
+            false => match &mut self.enclosing {
                 Some(enc) => enc.update(name, value),
                 None => Err(RuntimeError::NameError(name.clone())),
             },
@@ -53,13 +52,6 @@ impl Environment {
             enclosing: Some(Box::new(self)),
         }
     }
-
-    // pub fn enclosing(&self) -> Option<Self> {
-    //     match &self.enclosing {
-    //         Some(enc) => Some(*enc),
-    //         None => None,
-    //     }
-    // }
 
     fn get_ident(name: &Token) -> String {
         match name
@@ -122,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_set() {
-        let local = env_fixture();
+        let mut local = env_fixture();
         let c_value = LoxValue::Number(3.0);
         let c_token = Token::identifier("c".to_string());
         local.set(&c_token, c_value.clone());
@@ -131,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_scope() {
-        let local = env_fixture();
+        let mut local = env_fixture();
         let a_value = LoxValue::Number(3.0);
         let a_token = Token::identifier("a".to_string());
         local.set(&a_token, a_value.clone());
