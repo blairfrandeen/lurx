@@ -139,11 +139,11 @@ impl Interpreter {
                     }
                     self.execute_stmt(&callable.statements)?;
                     // self.env = self.env.enclosing().expect("Expect enclosing environment!");
-                    self.globals = *self
-                        .globals
-                        .enclosing
-                        .clone()
-                        .expect("Expect enclosing environment!");
+                    // self.globals = *self
+                    //     .globals
+                    //     .enclosing
+                    //     .clone()
+                    //     .expect("Expect enclosing environment!");
                     Ok(())
                 }
                 _ => {
@@ -154,18 +154,17 @@ impl Interpreter {
                 }
             },
             Stmt::Block(stmts) => {
-                // self.env = Environment::enclosed(self.env.clone());
                 let env = self.globals.clone();
                 self.globals = env.enclosed();
                 for stmt in stmts.into_iter() {
                     self.execute_stmt(stmt)?;
                 }
-                // self.env = self.env.enclosing().expect("Expect enclosing environment!");
-                self.globals = *self
-                    .globals
-                    .enclosing
-                    .clone()
-                    .expect("Expect enclosing environment!");
+                // self.globals = *self
+                //     .globals
+                //     .enclosing
+                //     .clone()
+                //     .expect("Expect enclosing environment!")
+                //     .borrow();
                 Ok(())
             }
             Stmt::Conditional {

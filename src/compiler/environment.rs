@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
@@ -7,7 +9,7 @@ use crate::compiler::object::LoxValue;
 #[derive(Debug, Clone)]
 pub struct Environment {
     data: HashMap<String, LoxValue>,
-    pub enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -15,7 +17,7 @@ impl Environment {
         match self.data.get(&Self::get_ident(&name)) {
             Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
-                Some(enc) => enc.get(&name),
+                Some(enc) => enc.borrow().get(&name),
                 None => Err(RuntimeError::NameError(name.clone())),
             },
         }
@@ -33,7 +35,7 @@ impl Environment {
                 Ok(())
             }
             false => match &mut self.enclosing {
-                Some(enc) => enc.update(name, value),
+                Some(enc) => enc.borrow_mut().update(name, value),
                 None => Err(RuntimeError::NameError(name.clone())),
             },
         }
@@ -49,7 +51,7 @@ impl Environment {
     pub fn enclosed(self) -> Self {
         Environment {
             data: HashMap::new().into(),
-            enclosing: Some(Box::new(self)),
+            enclosing: Some(Rc::new(RefCell::new(self))),
         }
     }
 
@@ -83,7 +85,7 @@ mod tests {
         };
         let local = Environment {
             data: local_data.into(),
-            enclosing: Some(Box::new(global)),
+            enclosing: Some(Rc::new(RefCell::new(global))),
         };
 
         local
