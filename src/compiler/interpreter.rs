@@ -102,7 +102,8 @@ impl Interpreter {
     pub fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
-                let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
+                let output = self.evaluate(expr)?;
+                let _ = writeln!(self.out, "{}", output);
                 Ok(())
             }
             Stmt::VarDecl { name, initializer } => {
@@ -159,7 +160,8 @@ impl Interpreter {
                 }
                 _ => {
                     if self.print_expr {
-                        let _ = writeln!(self.out, "{}", self.evaluate(expr)?);
+                        let output = self.evaluate(expr)?;
+                        let _ = writeln!(self.out, "{}", output);
                     }
                     Ok(())
                 }
@@ -203,7 +205,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn evaluate(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         match &expr {
             Expr::Unary { operator, right } => self.eval_unary(operator, right),
             Expr::Binary {
@@ -227,7 +229,7 @@ impl Interpreter {
     }
 
     fn eval_logical(
-        &self,
+        &mut self,
         left: &Expr,
         operator: &Token,
         right: &Expr,
@@ -247,7 +249,7 @@ impl Interpreter {
     }
 
     fn eval_binary(
-        &self,
+        &mut self,
         left: &Expr,
         operator: &Token,
         right: &Expr,
@@ -331,11 +333,11 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_grouping(&self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn eval_grouping(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
         self.evaluate(expr)
     }
 
-    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn eval_unary(&mut self, operator: &Token, right: &Expr) -> Result<LoxValue, RuntimeError> {
         let mut right = self.evaluate(right)?;
         right = match operator.type_ {
             TokenType::BANG => match right {
@@ -363,7 +365,7 @@ impl Interpreter {
         Ok(right)
     }
 
-    fn eval_literal(&self, token: &Token) -> Result<LoxValue, RuntimeError> {
+    fn eval_literal(&mut self, token: &Token) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
             TokenType::IDENTIFIER => self.locals.borrow().get(&token),
             _ => Ok(token.value()),
