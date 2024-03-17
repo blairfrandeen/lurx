@@ -796,14 +796,20 @@ mod tests {
 
     #[test]
     fn test_fib_while() {
-        let scopes = std::fs::read_to_string("tests/fib_while.lox").expect("file should exist");
-        test_output(scopes.as_str(), "12586269025\n")
+        let fib_while = std::fs::read_to_string("tests/fib_while.lox").expect("file should exist");
+        test_output(fib_while.as_str(), "12586269025\n")
     }
 
     #[test]
     fn test_fib_for() {
-        let scopes = std::fs::read_to_string("tests/fib_for.lox").expect("file should exist");
-        test_output(scopes.as_str(), "12586269025\n")
+        let fib_for = std::fs::read_to_string("tests/fib_for.lox").expect("file should exist");
+        test_output(fib_for.as_str(), "12586269025\n")
+    }
+
+    #[test]
+    fn test_is_even() {
+        let iseven = std::fs::read_to_string("tests/iseven.lox").expect("file should exist");
+        test_output(iseven.as_str(), "True\nFalse\n")
     }
 
     #[test]
@@ -888,6 +894,11 @@ mod tests {
     #[test]
     fn test_basic_func_call() {
         test_output("fun add(a,b) { print (a+b); } add(1,2);", "3\n");
+    }
+
+    #[test]
+    fn test_return_statement() {
+        test_output("fun one() { return 1; } var a = one(); print a;", "1\n");
     }
 
     fn test_output(source: &str, expected: &str) {
