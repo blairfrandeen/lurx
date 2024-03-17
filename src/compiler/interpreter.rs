@@ -33,6 +33,7 @@ pub enum RuntimeError {
 }
 
 pub struct Interpreter {
+    #[allow(dead_code)]
     globals: Environment,
     locals: Environment,
     out: Vec<u8>,
@@ -57,7 +58,7 @@ impl Interpreter {
 
     pub fn new() -> Self {
         let mut globals = Environment::new();
-        let mut locals = globals.clone().enclosed();
+        let locals = globals.clone().enclosed();
         for builtin_func in builtins().into_iter() {
             globals.set(&builtin_func.0, builtin_func.1);
         }
@@ -116,7 +117,7 @@ impl Interpreter {
                 parameters,
                 statements,
             } => {
-                self.globals.set(
+                self.locals.set(
                     name,
                     LoxValue::callable(name.clone(), parameters.clone(), *statements.clone()),
                 );
@@ -143,21 +144,13 @@ impl Interpreter {
                         panic!("Incorrect number of arguments!");
                         // TODO: Runtime error for incorrect # of args
                     }
-                    // self.env = Environment::enclosed(self.env.clone());
-                    let env = self.globals.clone();
-                    self.globals = env.enclosed();
+                    let mut env = self.locals.clone().enclosed();
                     for arg in std::iter::zip(callable.parameters, arguments) {
                         // TODO: Consider evaluating all arguments individually
                         // BEFORE setting them in the environment?
-                        self.globals.set(&arg.0, self.evaluate(arg.1)?);
+                        env.set(&arg.0, self.evaluate(arg.1)?);
                     }
-                    self.execute_stmt(&callable.statements)?;
-                    // self.env = self.env.enclosing().expect("Expect enclosing environment!");
-                    // self.globals = *self
-                    //     .globals
-                    //     .enclosing
-                    //     .clone()
-                    //     .expect("Expect enclosing environment!");
+                    self.execute_block(vec![callable.statements], env)?;
                     Ok(())
                 }
                 _ => {
