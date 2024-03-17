@@ -90,12 +90,12 @@ impl Interpreter {
         stmts: Vec<Stmt>,
         env: Environment,
     ) -> Result<(), RuntimeError> {
-        let prev_env = self.locals.clone();
-        self.locals = Rc::new(RefCell::new(env));
+        *self.locals.borrow_mut() = env.clone();
         for stmt in stmts.iter() {
             self.execute_stmt(stmt)?;
         }
-        self.locals = prev_env;
+        let enclosing = env.enclosing.unwrap();
+        self.locals = enclosing;
         Ok(())
     }
 
@@ -107,7 +107,10 @@ impl Interpreter {
             }
             Stmt::VarDecl { name, initializer } => {
                 match initializer {
-                    Some(init) => self.locals.borrow_mut().set(name, self.evaluate(init)?),
+                    Some(init) => {
+                        let assignment = self.evaluate(init)?;
+                        self.locals.borrow_mut().set(name, assignment);
+                    }
                     None => self.locals.borrow_mut().set(name, LoxValue::Nil),
                 }
                 Ok(())
