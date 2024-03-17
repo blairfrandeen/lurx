@@ -32,10 +32,9 @@ pub enum RuntimeError {
     NotImplemented,
 }
 
-#[allow(dead_code)]
 pub struct Interpreter {
     globals: Environment,
-    env: Environment,
+    locals: Environment,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -58,12 +57,13 @@ impl Interpreter {
 
     pub fn new() -> Self {
         let mut globals = Environment::new();
+        let mut locals = globals.clone().enclosed();
         for builtin_func in builtins().into_iter() {
             globals.set(&builtin_func.0, builtin_func.1);
         }
         Interpreter {
             globals,
-            env: Environment::new(),
+            locals,
             out: vec![],
             flush: false,
             print_expr: false,
@@ -84,6 +84,20 @@ impl Interpreter {
         self.print_expr = print_expr;
     }
 
+    pub fn execute_block(
+        &mut self,
+        stmts: Vec<Stmt>,
+        env: Environment,
+    ) -> Result<(), RuntimeError> {
+        let prev_env = self.locals.clone();
+        self.locals = env;
+        for stmt in stmts.iter() {
+            self.execute_stmt(stmt)?;
+        }
+        self.locals = prev_env;
+        Ok(())
+    }
+
     pub fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
@@ -92,8 +106,8 @@ impl Interpreter {
             }
             Stmt::VarDecl { name, initializer } => {
                 match initializer {
-                    Some(init) => self.globals.set(name, self.evaluate(init)?),
-                    None => self.globals.set(name, LoxValue::Nil),
+                    Some(init) => self.locals.set(name, self.evaluate(init)?),
+                    None => self.locals.set(name, LoxValue::Nil),
                 }
                 Ok(())
             }
@@ -110,7 +124,7 @@ impl Interpreter {
             }
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
-                    self.globals.update(name, self.evaluate(value)?)?;
+                    self.locals.update(name, self.evaluate(value)?)?;
                     Ok(())
                 }
                 Expr::Call {
@@ -154,17 +168,8 @@ impl Interpreter {
                 }
             },
             Stmt::Block(stmts) => {
-                let env = self.globals.clone();
-                self.globals = env.enclosed();
-                for stmt in stmts.into_iter() {
-                    self.execute_stmt(stmt)?;
-                }
-                // self.globals = *self
-                //     .globals
-                //     .enclosing
-                //     .clone()
-                //     .expect("Expect enclosing environment!")
-                //     .borrow();
+                let env = self.locals.clone().enclosed();
+                self.execute_block(stmts.to_vec(), env)?;
                 Ok(())
             }
             Stmt::Conditional {
@@ -363,7 +368,7 @@ impl Interpreter {
 
     fn eval_literal(&self, token: &Token) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => self.globals.get(&token),
+            TokenType::IDENTIFIER => self.locals.get(&token),
             _ => Ok(token.value()),
         }
     }
@@ -755,7 +760,7 @@ mod tests {
         let prgm = parser::program(token_iter, "var a;".to_string());
         let _ = interp.run(&prgm);
         let atok = Token::identifier("a".to_string());
-        assert_eq!(interp.globals.get(&atok), Ok(LoxValue::Nil))
+        assert_eq!(interp.locals.get(&atok), Ok(LoxValue::Nil))
     }
 
     #[test]
