@@ -135,7 +135,7 @@ impl Interpreter {
                 }
                 _ => {
                     let output = self.evaluate(expr)?;
-                    if self.print_expr {
+                    if self.print_expr && output != LoxValue::Nil {
                         let _ = writeln!(self.out, "{}", output);
                     }
                     Ok(())
