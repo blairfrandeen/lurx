@@ -920,20 +920,29 @@ mod tests {
 
     #[test]
     fn fun_call() {
+        test_fun_call("fun one() { return 1; }", vec![], Ok(LoxValue::Number(1.0)));
+    }
+
+    #[test]
+    fn fun_add() {
         test_fun_call(
-            "fun one() { return 1; }",
-            "one",
-            vec![],
-            Ok(LoxValue::Number(1.0)),
+            "fun additionetc(a, b) { return a+b; }",
+            vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+            Ok(LoxValue::Number(4.0)),
         );
     }
 
-    fn test_fun_call(
-        fn_decl: &str,
-        fn_name: &str,             // TODO: just parse this from fn_decl?
-        _arguments: Vec<LoxValue>, // TODO: wrap arguments as Expressions and use them
-        expected: Result<LoxValue, RuntimeError>,
-    ) {
+    /// Test the result of a function call in the interpreter. The `fn_decl` must be the
+    /// declaration for a single function only. The args should be the expected evaluation results
+    /// of expressions, and the final argument is the expected result.
+    /// ```
+    ///test_fun_call(
+    ///    "fun add(a, b) { return a+b; }",
+    ///    vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+    ///    Ok(LoxValue::Number(4.0)),
+    ///);
+    /// ```
+    fn test_fun_call(fn_decl: &str, args: Vec<LoxValue>, expected: Result<LoxValue, RuntimeError>) {
         let tokens = lexer::scan_source(&fn_decl.to_string()).unwrap();
         let program = parser::program(tokens, fn_decl.to_string());
         let mut interp = interpreter::Interpreter::new();
@@ -941,9 +950,27 @@ mod tests {
         interp.run(&program);
         dbg!(&interp.locals);
 
+        let arguments: Vec<Expr> = args
+            .iter()
+            .map(|arg| {
+                Expr::Literal(match arg {
+                    LoxValue::Number(n) => Token::numlit(*n),
+                    LoxValue::StrLit(s) => Token::stringlit(s.to_string()),
+                    _ => todo!(),
+                })
+            })
+            .collect();
+
+        let binding = &interp.locals.borrow().clone();
+        let fn_name = binding
+            .data
+            .keys()
+            .nth(0)
+            .expect("function should have been defined!");
+
         let fn_call = Expr::Call {
             callee: Box::new(Expr::Literal(Token::identifier(fn_name.to_string()))),
-            arguments: vec![],
+            arguments,
             paren: Token::from_type(TokenType::RIGHT_PAREN),
         };
 

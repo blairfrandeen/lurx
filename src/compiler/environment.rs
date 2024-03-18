@@ -8,7 +8,7 @@ use crate::compiler::object::LoxValue;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    data: HashMap<String, LoxValue>,
+    pub data: HashMap<String, LoxValue>,
     pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
