@@ -901,6 +901,13 @@ mod tests {
             Ok(LoxValue::Number(5.0)),
         );
     }
+    #[test]
+    fn test_fn_eval_envs() {
+        test_output(
+            "fun three(x) { return 3*x; } var x = 1; print three(x)+three(x-1);",
+            "3\n",
+        );
+    }
 
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
