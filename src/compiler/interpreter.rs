@@ -892,20 +892,13 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_func_call() {
-        test_output("fun add(a,b) { print (a+b); } add(1,2);", "3\n");
-    }
-
-    #[test]
-    fn test_return_statement() {
-        test_output("fun one() { return 1; } var a = one(); print a;", "1\n");
-    }
-
-    #[test]
-    fn test_return_from_loop() {
-        test_output(
-            "fun loop5() { var a = 0; while (true) { if (a == 5) return 5; a = a + 1; }} print loop5();",
-            "5\n",
+    fn fun_return_from_loop() {
+        assert_eq!(
+            fun_fixt(
+                "fun loop5() { var a = 0; while (true) { if (a == 5) return 5; a = a + 1; }}",
+                vec![]
+            ),
+            Ok(LoxValue::Number(5.0)),
         );
     }
 
@@ -920,14 +913,19 @@ mod tests {
 
     #[test]
     fn fun_call() {
-        test_fun_call("fun one() { return 1; }", vec![], Ok(LoxValue::Number(1.0)));
+        assert_eq!(
+            fun_fixt("fun one() { return 1; }", vec![]),
+            Ok(LoxValue::Number(1.0))
+        );
     }
 
     #[test]
     fn fun_add() {
-        test_fun_call(
-            "fun additionetc(a, b) { return a+b; }",
-            vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+        assert_eq!(
+            fun_fixt(
+                "fun additionetc(a, b) { return a+b; }",
+                vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+            ),
             Ok(LoxValue::Number(4.0)),
         );
     }
@@ -936,31 +934,39 @@ mod tests {
     /// declaration for a single function only. The args should be the expected evaluation results
     /// of expressions, and the final argument is the expected result.
     /// ```
-    ///test_fun_call(
-    ///    "fun add(a, b) { return a+b; }",
-    ///    vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+    ///assert_eq!(
+    ///    fun_fixt(
+    ///        "fun add(a, b) { return a+b; }",
+    ///        vec![LoxValue::Number(1.0), LoxValue::Number(3.0)],
+    ///    ),
     ///    Ok(LoxValue::Number(4.0)),
     ///);
     /// ```
-    fn test_fun_call(fn_decl: &str, args: Vec<LoxValue>, expected: Result<LoxValue, RuntimeError>) {
+    fn fun_fixt(fn_decl: &str, args: Vec<LoxValue>) -> Result<LoxValue, RuntimeError> {
+        // scan, parse, and run the interpreter so that a function call is defined.
         let tokens = lexer::scan_source(&fn_decl.to_string()).unwrap();
         let program = parser::program(tokens, fn_decl.to_string());
         let mut interp = interpreter::Interpreter::new();
         interp.set_flush(false);
         interp.run(&program);
-        dbg!(&interp.locals);
 
+        // turn the arguments into expressions that can be passed to the function call
         let arguments: Vec<Expr> = args
             .iter()
             .map(|arg| {
                 Expr::Literal(match arg {
                     LoxValue::Number(n) => Token::numlit(*n),
                     LoxValue::StrLit(s) => Token::stringlit(s.to_string()),
-                    _ => todo!(),
+                    LoxValue::Nil => Token::from_type(TokenType::NIL),
+                    LoxValue::False => Token::from_type(TokenType::FALSE),
+                    LoxValue::True => Token::from_type(TokenType::TRUE),
+                    _ => todo!(), // TODO: add callable support
                 })
             })
             .collect();
 
+        // figure out the function name, assuming that the interpreter only has a single name
+        // defined in locals that corressponds to the function call being tested
         let binding = &interp.locals.borrow().clone();
         let fn_name = binding
             .data
@@ -968,14 +974,14 @@ mod tests {
             .nth(0)
             .expect("function should have been defined!");
 
+        // construct the function call
         let fn_call = Expr::Call {
             callee: Box::new(Expr::Literal(Token::identifier(fn_name.to_string()))),
             arguments,
             paren: Token::from_type(TokenType::RIGHT_PAREN),
         };
 
-        let result = interp.evaluate(&fn_call);
-
-        assert_eq!(result, expected);
+        // call the function in the interpreter and return it
+        interp.evaluate(&fn_call)
     }
 }
