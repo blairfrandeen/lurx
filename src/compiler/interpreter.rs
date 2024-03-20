@@ -483,9 +483,20 @@ mod tests {
         let true_exp = parser::Expr::Literal(Token::from_type(TokenType::TRUE));
         let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
         let mut interp = Interpreter::new();
-        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::OR), &false_exp);
+        let env = interp.globals.clone();
+        let result = interp.eval_logical(
+            &true_exp,
+            &Token::from_type(TokenType::OR),
+            &false_exp,
+            env.clone(),
+        );
         assert_eq!(result, Ok(LoxValue::True));
-        let result = interp.eval_logical(&false_exp, &Token::from_type(TokenType::OR), &false_exp);
+        let result = interp.eval_logical(
+            &false_exp,
+            &Token::from_type(TokenType::OR),
+            &false_exp,
+            env,
+        );
         assert_eq!(result, Ok(LoxValue::False));
     }
     #[test]
@@ -493,9 +504,20 @@ mod tests {
         let true_exp = parser::Expr::Literal(Token::from_type(TokenType::TRUE));
         let false_exp = parser::Expr::Literal(Token::from_type(TokenType::FALSE));
         let mut interp = Interpreter::new();
-        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &true_exp);
+        let env = interp.globals.clone();
+        let result = interp.eval_logical(
+            &true_exp,
+            &Token::from_type(TokenType::AND),
+            &true_exp,
+            env.clone(),
+        );
         assert_eq!(result, Ok(LoxValue::True));
-        let result = interp.eval_logical(&true_exp, &Token::from_type(TokenType::AND), &false_exp);
+        let result = interp.eval_logical(
+            &true_exp,
+            &Token::from_type(TokenType::AND),
+            &false_exp,
+            env,
+        );
         assert_eq!(result, Ok(LoxValue::False));
     }
 
@@ -504,7 +526,8 @@ mod tests {
         let mut token_iter = token_iter("!true");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un).unwrap();
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env).unwrap();
         assert_eq!(eval, LoxValue::False);
     }
     #[test]
@@ -512,7 +535,8 @@ mod tests {
         let mut token_iter = token_iter("!false");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un).unwrap();
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env).unwrap();
         assert_eq!(eval, LoxValue::True);
     }
     #[test]
@@ -520,7 +544,8 @@ mod tests {
         let mut token_iter = token_iter("!nil");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un).unwrap();
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env).unwrap();
         assert_eq!(eval, LoxValue::True);
     }
     #[test]
@@ -528,7 +553,8 @@ mod tests {
         let mut token_iter = token_iter("---2");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un).unwrap();
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env).unwrap();
         assert_eq!(eval, LoxValue::Number(-2.0));
     }
 
@@ -537,7 +563,8 @@ mod tests {
         let mut token_iter = token_iter("!2");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un);
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env);
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
@@ -552,7 +579,8 @@ mod tests {
         let mut token_iter = token_iter("-true");
         let un = parser::expression(&mut token_iter).unwrap();
         let mut interp = Interpreter::new();
-        let eval = interp.evaluate(&un);
+        let env = interp.globals.clone();
+        let eval = interp.evaluate(&un, env);
         assert_eq!(
             eval,
             Err(RuntimeError::InvalidOperand {
@@ -566,8 +594,9 @@ mod tests {
     fn test_zero_div_error() {
         let mut token_iter = token_iter("1/0");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::ZeroDivision {
@@ -582,8 +611,9 @@ mod tests {
     fn test_type_before_zero_div_error() {
         let mut token_iter = token_iter("\"anything\"/0");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -598,8 +628,9 @@ mod tests {
     fn test_mult() {
         let mut token_iter = token_iter("7*7");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::Number(49.0)))
     }
 
@@ -607,8 +638,9 @@ mod tests {
     fn test_div() {
         let mut token_iter = token_iter("-49/-7");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::Number(7.0)))
     }
 
@@ -616,8 +648,9 @@ mod tests {
     fn test_factor_type_err() {
         let mut token_iter_ = token_iter("-49/\"seven\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter_).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env.clone());
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -628,7 +661,7 @@ mod tests {
         );
         let mut token_iter_ = token_iter("true * nil");
         let expr = parser::expression(&mut token_iter_).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -643,8 +676,9 @@ mod tests {
     fn test_term_type_err() {
         let mut token_iter = token_iter("-49+true");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -658,16 +692,18 @@ mod tests {
     fn test_term_addition() {
         let mut token_iter = token_iter("5*8/4 + 8/2");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::Number(14.0)))
     }
     #[test]
     fn test_string_concat() {
         let mut token_iter = token_iter("\"Hello \" + \"World!\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::StrLit("Hello World!".to_string())))
     }
 
@@ -675,8 +711,9 @@ mod tests {
     fn test_string_sub_error() {
         let mut token_iter = token_iter("\"Hello \" - \"World!\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -691,8 +728,9 @@ mod tests {
     fn test_cmp() {
         let mut token_iter = token_iter("3>2");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::True))
     }
 
@@ -700,8 +738,9 @@ mod tests {
     fn test_cmp_err() {
         let mut token_iter = token_iter("3>true");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -715,8 +754,9 @@ mod tests {
     fn test_eq() {
         let mut token_iter = token_iter("(2+2)==5");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::False))
     }
 
@@ -724,8 +764,9 @@ mod tests {
     fn test_str_eq() {
         let mut token_iter = token_iter("\"hello\"==\"hello\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::True))
     }
 
@@ -733,8 +774,9 @@ mod tests {
     fn test_str_not_eq() {
         let mut token_iter = token_iter("\"parrot\"!=\"alive\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::True))
     }
 
@@ -742,8 +784,9 @@ mod tests {
     fn test_str_num_cmp() {
         let mut token_iter = token_iter("\"parrot\"!=33");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -758,8 +801,9 @@ mod tests {
     fn test_str_gt_cmp() {
         let mut token_iter = token_iter("\"coffee\"<=\"tea\"");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(
             result,
             Err(RuntimeError::TypeError {
@@ -774,8 +818,9 @@ mod tests {
     fn test_cmp_bool() {
         let mut token_iter = token_iter("true==false");
         let mut interp = Interpreter::new();
+        let env = interp.globals.clone();
         let expr = parser::expression(&mut token_iter).unwrap();
-        let result = interp.evaluate(&expr);
+        let result = interp.evaluate(&expr, env);
         assert_eq!(result, Ok(LoxValue::False))
     }
 
@@ -786,7 +831,7 @@ mod tests {
         let prgm = parser::program(token_iter, "var a;".to_string());
         let _ = interp.run(&prgm);
         let atok = Token::identifier("a".to_string());
-        assert_eq!(interp.locals.borrow().get(&atok), Ok(LoxValue::Nil));
+        assert_eq!(interp.globals.borrow().get(&atok), Ok(LoxValue::Nil));
     }
 
     #[test]
@@ -996,12 +1041,14 @@ mod tests {
 
         // figure out the function name, assuming that the interpreter only has a single name
         // defined in locals that corressponds to the function call being tested
-        let binding = &interp.locals.borrow().clone();
+        let binding = &interp.globals.borrow().clone();
         let fn_name = binding
             .data
             .keys()
-            .nth(0)
+            .last()
             .expect("function should have been defined!");
+
+        dbg!(&fn_name);
 
         // construct the function call
         let fn_call = Expr::Call {
@@ -1011,6 +1058,6 @@ mod tests {
         };
 
         // call the function in the interpreter and return it
-        interp.evaluate(&fn_call)
+        interp.evaluate(&fn_call, Rc::new(RefCell::new(binding.clone())))
     }
 }
