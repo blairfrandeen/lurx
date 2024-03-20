@@ -25,6 +25,7 @@ impl Callable {
         }
     }
 
+    #[allow(unused)]
     pub fn call(
         &self,
         interpreter: &mut Interpreter,
@@ -38,11 +39,12 @@ impl Callable {
                 parameters,
                 statements,
             } => {
-                let mut env = environment.enclosed();
-                for arg in std::iter::zip(parameters, args) {
-                    env.set(&arg.0, arg.1);
-                }
-                interpreter.execute_stmt(&statements)?;
+                todo!()
+                // let mut env = environment.enclosed();
+                // for arg in std::iter::zip(parameters, args) {
+                //     env.set(&arg.0, arg.1);
+                // }
+                // interpreter.execute_stmt(&statements)?;
             }
         }
         Ok(LoxValue::Nil)

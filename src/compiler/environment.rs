@@ -48,10 +48,10 @@ impl Environment {
         }
     }
 
-    pub fn enclosed(self) -> Self {
+    pub fn enclosed(enclosing: Rc<RefCell<Environment>>) -> Self {
         Environment {
-            data: HashMap::new().into(),
-            enclosing: Some(Rc::new(RefCell::new(self))),
+            data: HashMap::new(),
+            enclosing: Some(enclosing),
         }
     }
 

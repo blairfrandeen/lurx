@@ -33,9 +33,7 @@ pub enum RuntimeError {
 }
 
 pub struct Interpreter {
-    #[allow(dead_code)]
     globals: Rc<RefCell<Environment>>,
-    locals: Rc<RefCell<Environment>>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -45,7 +43,7 @@ impl Interpreter {
     pub fn run(&mut self, prgm: &Program) {
         let mut stmts = prgm.statements.iter();
         while let Some(stmt) = stmts.next() {
-            match &self.execute_stmt(stmt) {
+            match &self.execute_stmt(stmt, self.globals.clone()) {
                 Ok(()) => {
                     if self.flush {
                         self.flush()
@@ -58,13 +56,11 @@ impl Interpreter {
 
     pub fn new() -> Self {
         let mut globals = Environment::new();
-        let locals = globals.clone().enclosed();
         for builtin_func in builtins().into_iter() {
             globals.set(&builtin_func.0, builtin_func.1);
         }
         Interpreter {
             globals: Rc::new(RefCell::new(globals)),
-            locals: Rc::new(RefCell::new(locals)),
             out: vec![],
             flush: false,
             print_expr: false,
@@ -88,31 +84,34 @@ impl Interpreter {
     pub fn execute_block(
         &mut self,
         stmts: Vec<Stmt>,
-        env: Environment,
+        env: Rc<RefCell<Environment>>,
     ) -> Result<(), RuntimeError> {
-        *self.locals.borrow_mut() = env;
         for stmt in stmts.iter() {
-            self.execute_stmt(stmt)?;
+            self.execute_stmt(stmt, env.clone())?;
         }
-        let enclosing = self.locals.borrow().clone().enclosing.unwrap();
-        self.locals = enclosing;
         Ok(())
     }
 
-    pub fn execute_stmt(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    pub fn execute_stmt(
+        &mut self,
+        stmt: &Stmt,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Result<(), RuntimeError> {
         match &stmt {
             Stmt::Print(expr) => {
-                let output = self.evaluate(expr)?;
+                let output = self.evaluate(expr, environment)?;
                 let _ = writeln!(self.out, "{}", output);
                 Ok(())
             }
             Stmt::VarDecl { name, initializer } => {
                 match initializer {
                     Some(init) => {
-                        let assignment = self.evaluate(init)?;
-                        self.locals.borrow_mut().set(name, assignment);
+                        let assignment = self.evaluate(init, environment.clone())?;
+                        // dbg!(&assignment);
+                        environment.borrow_mut().set(name, assignment);
+                        // dbg!(&environment);
                     }
-                    None => self.locals.borrow_mut().set(name, LoxValue::Nil),
+                    None => environment.borrow_mut().set(name, LoxValue::Nil),
                 }
                 Ok(())
             }
@@ -121,7 +120,7 @@ impl Interpreter {
                 parameters,
                 statements,
             } => {
-                self.locals.borrow_mut().set(
+                environment.borrow_mut().set(
                     name,
                     LoxValue::callable(name.clone(), parameters.clone(), *statements.clone()),
                 );
@@ -129,12 +128,12 @@ impl Interpreter {
             }
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
-                    let assignment = self.evaluate(value)?;
-                    self.locals.borrow_mut().update(name, assignment)?;
+                    let assignment = self.evaluate(value, environment.clone())?;
+                    environment.borrow_mut().update(name, assignment)?;
                     Ok(())
                 }
                 _ => {
-                    let output = self.evaluate(expr)?;
+                    let output = self.evaluate(expr, environment)?;
                     if self.print_expr && output != LoxValue::Nil {
                         let _ = writeln!(self.out, "{}", output);
                     }
@@ -142,7 +141,7 @@ impl Interpreter {
                 }
             },
             Stmt::Block(stmts) => {
-                let env = self.locals.borrow().clone().enclosed();
+                let env = Rc::new(RefCell::new(Environment::enclosed(environment)));
                 self.execute_block(stmts.to_vec(), env)?;
                 Ok(())
             }
@@ -151,11 +150,11 @@ impl Interpreter {
                 true_branch,
                 false_branch,
             } => {
-                if is_truthy(&self.evaluate(condition)?) {
-                    self.execute_stmt(true_branch)
+                if is_truthy(&self.evaluate(condition, environment.clone())?) {
+                    self.execute_stmt(true_branch, environment)
                 } else {
                     match false_branch {
-                        Some(branch) => self.execute_stmt(branch),
+                        Some(branch) => self.execute_stmt(branch, environment),
                         None => Ok(()),
                     }
                 }
@@ -164,8 +163,8 @@ impl Interpreter {
                 condition,
                 statements,
             } => {
-                while is_truthy(&self.evaluate(condition)?) {
-                    match self.execute_stmt(statements) {
+                while is_truthy(&self.evaluate(condition, environment.clone())?) {
+                    match self.execute_stmt(statements, environment.clone()) {
                         Ok(()) => {}
                         Err(err) => match err {
                             RuntimeError::Break => break,
@@ -180,29 +179,33 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn evaluate(
+        &mut self,
+        expr: &Expr,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Result<LoxValue, RuntimeError> {
         match &expr {
-            Expr::Unary { operator, right } => self.eval_unary(operator, right),
+            Expr::Unary { operator, right } => self.eval_unary(operator, right, environment),
             Expr::Binary {
                 left,
                 operator,
                 right,
-            } => self.eval_binary(left, operator, right),
-            Expr::Grouping(expr) => self.eval_grouping(expr),
-            Expr::Literal(token) => self.eval_literal(token),
-            Expr::Variable(token) => self.eval_literal(token),
+            } => self.eval_binary(left, operator, right, environment),
+            Expr::Grouping(expr) => self.eval_grouping(expr, environment),
+            Expr::Literal(token) => self.eval_literal(token, environment),
+            Expr::Variable(token) => self.eval_literal(token, environment),
             Expr::Assign { name: _, value: _ } => todo!(),
             Expr::Logical {
                 left,
                 operator,
                 right,
-            } => self.eval_logical(left, operator, right),
+            } => self.eval_logical(left, operator, right, environment),
             Expr::Call {
                 callee,
                 arguments,
                 paren: _,
             } => {
-                let callee_obj = self.evaluate(callee)?;
+                let callee_obj = self.evaluate(callee, environment.clone())?;
                 let callable = match callee_obj {
                     LoxValue::Callable(clbe) => clbe,
                     _ => panic!("{:?} is not callable!", callee_obj),
@@ -213,17 +216,21 @@ impl Interpreter {
                     panic!("Incorrect number of arguments!");
                     // TODO: Runtime error for incorrect # of args
                 }
-                let mut env = self.locals.borrow().clone().enclosed();
+                let mut env = Environment::enclosed(environment.clone());
                 for arg in std::iter::zip(callable.parameters, arguments) {
                     // TODO: Consider evaluating all arguments individually
                     // BEFORE setting them in the environment?
-                    env.set(&arg.0, self.evaluate(arg.1)?);
+                    let arg_value = self.evaluate(arg.1, environment.clone())?;
+                    env.set(&arg.0, arg_value);
                 }
-                match self.execute_block(vec![callable.statements], env) {
+                match self.execute_block(
+                    vec![callable.statements],
+                    Rc::new(RefCell::new(env.clone())),
+                ) {
                     Ok(_) => Ok(LoxValue::Nil),
                     Err(err) => match err {
                         RuntimeError::Return(expr) => {
-                            let retval = self.evaluate(&expr)?;
+                            let retval = self.evaluate(&expr, Rc::new(RefCell::new(env)))?;
                             Ok(retval)
                         }
                         _ => Err(err),
@@ -238,9 +245,10 @@ impl Interpreter {
         left: &Expr,
         operator: &Token,
         right: &Expr,
+        environment: Rc<RefCell<Environment>>,
     ) -> Result<LoxValue, RuntimeError> {
-        let right = self.evaluate(right)?;
-        let left = self.evaluate(left)?;
+        let right = self.evaluate(right, environment.clone())?;
+        let left = self.evaluate(left, environment.clone())?;
         let result = match operator.type_ {
             TokenType::AND => is_truthy(&left) & is_truthy(&right),
             TokenType::OR => is_truthy(&left) | is_truthy(&right),
@@ -258,9 +266,10 @@ impl Interpreter {
         left: &Expr,
         operator: &Token,
         right: &Expr,
+        environment: Rc<RefCell<Environment>>,
     ) -> Result<LoxValue, RuntimeError> {
-        let right = self.evaluate(right)?;
-        let left = self.evaluate(left)?;
+        let right = self.evaluate(right, environment.clone())?;
+        let left = self.evaluate(left, environment.clone())?;
 
         let value = match operator.type_ {
             TokenType::SLASH => {
@@ -338,12 +347,21 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn eval_grouping(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
-        self.evaluate(expr)
+    fn eval_grouping(
+        &mut self,
+        expr: &Expr,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Result<LoxValue, RuntimeError> {
+        self.evaluate(expr, environment)
     }
 
-    fn eval_unary(&mut self, operator: &Token, right: &Expr) -> Result<LoxValue, RuntimeError> {
-        let mut right = self.evaluate(right)?;
+    fn eval_unary(
+        &mut self,
+        operator: &Token,
+        right: &Expr,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Result<LoxValue, RuntimeError> {
+        let mut right = self.evaluate(right, environment)?;
         right = match operator.type_ {
             TokenType::BANG => match right {
                 LoxValue::True => LoxValue::False,
@@ -370,9 +388,13 @@ impl Interpreter {
         Ok(right)
     }
 
-    fn eval_literal(&mut self, token: &Token) -> Result<LoxValue, RuntimeError> {
+    fn eval_literal(
+        &mut self,
+        token: &Token,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => self.locals.borrow().get(&token),
+            TokenType::IDENTIFIER => environment.borrow().get(&token),
             _ => Ok(token.value()),
         }
     }
