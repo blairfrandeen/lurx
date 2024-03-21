@@ -219,7 +219,7 @@ impl Interpreter {
             } => {
                 let callee_obj = self.evaluate(callee, environment.clone())?;
                 let (callable, closure) = match callee_obj {
-                    LoxValue::Callable(clbe, closure) => (clbe, closure.clone()),
+                    LoxValue::Callable(clbe, closure) => (clbe, closure),
                     _ => panic!("{:?} is not callable!", callee_obj),
                     // TODO: Runtime error if not callable
                 };
