@@ -987,7 +987,7 @@ mod tests {
 
     /// Test the result of a function call in the interpreter. The `fn_decl` must be the
     /// declaration for a single function only. The args should be the expected evaluation results
-    /// of expressions, and the final argument is the expected result.
+    /// of expressions.
     /// ```
     ///assert_eq!(
     ///    fun_fixt(
@@ -1020,23 +1020,20 @@ mod tests {
             })
             .collect();
 
-        // figure out the function name, assuming that the interpreter only has a single name
-        // defined in locals that corressponds to the function call being tested
-        let binding = &interp.globals.borrow().clone();
-        let fn_name = binding
-            .data
-            .keys()
-            .last()
-            .expect("function should have been defined!");
+        let fn_name = match &program.statements[0] {
+            Stmt::FunDecl { name, .. } => name.clone(),
+            _ => panic!("Expect first statement to be function declaration!"),
+        };
 
         // construct the function call
         let fn_call = Expr::Call {
-            callee: Box::new(Expr::Literal(Token::identifier(fn_name.to_string()))),
+            callee: Box::new(Expr::Literal(fn_name)),
             arguments,
             paren: Token::from_type(TokenType::RIGHT_PAREN),
         };
 
         // call the function in the interpreter and return it
-        interp.evaluate(&fn_call, Rc::new(RefCell::new(binding.clone())))
+        let binding = interp.globals.borrow().clone();
+        interp.evaluate(&fn_call, Rc::new(RefCell::new(binding)))
     }
 }
