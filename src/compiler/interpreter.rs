@@ -1,10 +1,11 @@
-use crate::compiler::builtins::builtins;
-use crate::compiler::environment::Environment;
-use crate::compiler::errors::ErrorReport;
-// use crate::compiler::function::Callable;
-use crate::compiler::lexer::{Literal, Token, TokenType};
-use crate::compiler::object::LoxValue;
-use crate::compiler::parser::{Expr, Program, Stmt};
+use crate::compiler::{
+    builtins::builtins,
+    environment::Environment,
+    errors::ErrorReport,
+    lexer::{Literal, Token, TokenType},
+    object::LoxValue,
+    parser::{Expr, Program, Stmt},
+};
 
 use std::cell::RefCell;
 use std::io::Write;
@@ -122,7 +123,7 @@ impl Interpreter {
             } => {
                 environment.borrow_mut().set(
                     name,
-                    LoxValue::callable(name.clone(), parameters.clone(), *statements.clone()),
+                    LoxValue::function(name.clone(), parameters.clone(), *statements.clone()),
                 );
                 Ok(())
             }
@@ -179,7 +180,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(
+    pub fn evaluate(
         &mut self,
         expr: &Expr,
         environment: Rc<RefCell<Environment>>,
@@ -212,30 +213,7 @@ impl Interpreter {
                     // TODO: Runtime error if not callable
                 };
 
-                if arguments.len() as u8 != callable.arity {
-                    panic!("Incorrect number of arguments!");
-                    // TODO: Runtime error for incorrect # of args
-                }
-                let mut env = Environment::enclosed(environment.clone());
-                for arg in std::iter::zip(callable.parameters, arguments) {
-                    // TODO: Consider evaluating all arguments individually
-                    // BEFORE setting them in the environment?
-                    let arg_value = self.evaluate(arg.1, environment.clone())?;
-                    env.set(&arg.0, arg_value);
-                }
-                match self.execute_block(
-                    vec![callable.statements],
-                    Rc::new(RefCell::new(env.clone())),
-                ) {
-                    Ok(_) => Ok(LoxValue::Nil),
-                    Err(err) => match err {
-                        RuntimeError::Return(expr) => {
-                            let retval = self.evaluate(&expr, Rc::new(RefCell::new(env)))?;
-                            Ok(retval)
-                        }
-                        _ => Err(err),
-                    },
-                }
+                callable.call(self, environment, arguments.clone())
             }
         }
     }
@@ -1047,8 +1025,6 @@ mod tests {
             .keys()
             .last()
             .expect("function should have been defined!");
-
-        dbg!(&fn_name);
 
         // construct the function call
         let fn_call = Expr::Call {

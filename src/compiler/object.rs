@@ -1,6 +1,4 @@
-use crate::compiler::lexer::Token;
-use crate::compiler::parser::Stmt;
-use crate::compiler::LoxFloat;
+use crate::compiler::{function::Callable, lexer::Token, parser::Stmt, LoxFloat};
 
 use std::fmt::{Display, Formatter};
 
@@ -11,22 +9,13 @@ pub enum LoxValue {
     True,
     False,
     Nil,
-    Callable(LoxCallable),
-}
-
-#[allow(unused)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct LoxCallable {
-    pub arity: u8,
-    pub name: Token,
-    pub parameters: Vec<Token>,
-    pub statements: Stmt,
+    Callable(Callable),
 }
 
 impl LoxValue {
-    pub fn callable(name: Token, parameters: Vec<Token>, statements: Stmt) -> Self {
+    pub fn function(name: Token, parameters: Vec<Token>, statements: Stmt) -> Self {
         let arity = parameters.len() as u8; // TODO: Check for too many params
-        LoxValue::Callable(LoxCallable {
+        LoxValue::Callable(Callable::Function {
             arity,
             name,
             parameters,
@@ -91,7 +80,9 @@ impl Display for LoxValue {
             LoxValue::True => write!(f, "True")?,
             LoxValue::False => write!(f, "False")?,
             LoxValue::Nil => write!(f, "Nil")?,
-            LoxValue::Callable(callable) => write!(f, "<function {}>", callable.name)?,
+            LoxValue::Callable(callable) => match callable {
+                Callable::Function { name, .. } => write!(f, "<function {}>", name)?,
+            },
         }
         Ok(())
     }
