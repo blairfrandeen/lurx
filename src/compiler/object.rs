@@ -1,6 +1,4 @@
-use crate::compiler::{
-    environment::Environment, function::Callable, lexer::Token, parser::Stmt, LoxFloat,
-};
+use crate::compiler::{environment::Environment, function::Callable, LoxFloat};
 
 use std::{
     cell::RefCell,
@@ -16,24 +14,6 @@ pub enum LoxValue {
     False,
     Nil,
     Callable(Callable, Rc<RefCell<Environment>>),
-}
-
-impl LoxValue {
-    pub fn function(
-        name: Token,
-        parameters: Vec<Token>,
-        statements: Stmt,
-        environment: Rc<RefCell<Environment>>,
-    ) -> Self {
-        LoxValue::Callable(
-            Callable::Function {
-                name,
-                parameters,
-                statements,
-            },
-            environment,
-        )
-    }
 }
 
 impl PartialOrd for LoxValue {

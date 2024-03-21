@@ -2,6 +2,7 @@ use crate::compiler::{
     builtins::builtins,
     environment::Environment,
     errors::ErrorReport,
+    function::Callable,
     lexer::{Literal, Token, TokenType},
     object::LoxValue,
     parser::{Expr, Program, Stmt},
@@ -124,13 +125,16 @@ impl Interpreter {
                 parameters,
                 statements,
             } => {
+                let closure = environment.clone();
                 environment.borrow_mut().set(
                     name,
-                    LoxValue::function(
-                        name.clone(),
-                        parameters.clone(),
-                        *statements.clone(),
-                        environment.clone(),
+                    LoxValue::Callable(
+                        Callable::Function {
+                            name: name.clone(),
+                            parameters: parameters.clone(),
+                            statements: *statements.clone(),
+                        },
+                        closure,
                     ),
                 );
                 Ok(())
@@ -216,12 +220,21 @@ impl Interpreter {
             } => {
                 let callee_obj = self.evaluate(callee, environment.clone())?;
                 let (callable, closure) = match callee_obj {
-                    LoxValue::Callable(clbe, closure) => (clbe, closure),
+                    LoxValue::Callable(clbe, closure) => (clbe, closure.clone()),
                     _ => panic!("{:?} is not callable!", callee_obj),
                     // TODO: Runtime error if not callable
                 };
+                if arguments.len() != callable.arity() {
+                    panic!("Incorrect number of arguments!");
+                    // TODO: Runtime error for incorrect # of args
+                }
+                let mut args = Vec::new();
+                for arg in arguments {
+                    let arg_val = self.evaluate(arg, environment.clone())?;
+                    args.push(arg_val);
+                }
 
-                callable.call(self, environment, arguments.clone())
+                callable.call(self, closure, args)
             }
         }
     }

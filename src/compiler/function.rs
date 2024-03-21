@@ -3,7 +3,7 @@ use crate::compiler::{
     interpreter::{Interpreter, RuntimeError},
     lexer::Token,
     object::LoxValue,
-    parser::{Expr, Stmt},
+    parser::Stmt,
 };
 
 use std::{cell::RefCell, rc::Rc};
@@ -41,7 +41,7 @@ impl Callable {
         &self,
         interpreter: &mut Interpreter,
         environment: Rc<RefCell<Environment>>,
-        args: Vec<Expr>,
+        args: Vec<LoxValue>,
     ) -> Result<LoxValue, RuntimeError> {
         if args.len() != self.arity() {
             panic!("Incorrect number of arguments!");
@@ -57,8 +57,7 @@ impl Callable {
                 for arg in std::iter::zip(parameters, args) {
                     // TODO: Consider evaluating all arguments individually
                     // BEFORE setting them in the environment?
-                    let arg_value = interpreter.evaluate(&arg.1, environment.clone())?;
-                    env.set(&arg.0, arg_value);
+                    env.set(&arg.0, arg.1);
                 }
                 match interpreter
                     .execute_block(vec![statements.clone()], Rc::new(RefCell::new(env.clone())))
