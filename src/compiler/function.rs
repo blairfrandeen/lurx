@@ -16,16 +16,26 @@ pub enum Callable {
         parameters: Vec<Token>,
         statements: Stmt,
     },
+    BuiltIn {
+        arity: u8,
+        name: Token,
+        parameters: Vec<LoxValue>,
+        function: fn(&[LoxValue]) -> LoxValue,
+    },
 }
 
 impl Callable {
-    pub fn name(&self) -> String {
-        "bob".to_string()
+    pub fn name(&self) -> Token {
+        match &self {
+            Callable::Function { name, .. } => name.clone(),
+            Callable::BuiltIn { name, .. } => name.clone(),
+        }
     }
 
     pub fn arity(&self) -> u8 {
         match &self {
             Callable::Function { arity, .. } => *arity,
+            Callable::BuiltIn { arity, .. } => *arity,
         }
     }
 
@@ -35,17 +45,16 @@ impl Callable {
         environment: Rc<RefCell<Environment>>,
         args: Vec<Expr>,
     ) -> Result<LoxValue, RuntimeError> {
+        if args.len() as u8 != self.arity() {
+            panic!("Incorrect number of arguments!");
+            // TODO: Runtime error for incorrect # of args
+        }
         match &self {
             Callable::Function {
-                arity,
-                name: _,
                 parameters,
                 statements,
+                ..
             } => {
-                if args.len() as u8 != *arity {
-                    panic!("Incorrect number of arguments!");
-                    // TODO: Runtime error for incorrect # of args
-                }
                 let mut env = Environment::enclosed(environment.clone());
                 for arg in std::iter::zip(parameters, args) {
                     // TODO: Consider evaluating all arguments individually
@@ -66,6 +75,7 @@ impl Callable {
                     },
                 }
             }
+            Callable::BuiltIn { .. } => todo!(),
         }
     }
 }

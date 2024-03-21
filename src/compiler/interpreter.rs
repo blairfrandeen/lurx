@@ -58,7 +58,10 @@ impl Interpreter {
     pub fn new() -> Self {
         let mut globals = Environment::new();
         for builtin_func in builtins().into_iter() {
-            globals.set(&builtin_func.0, builtin_func.1);
+            match builtin_func {
+                LoxValue::Callable(ref func) => globals.set(&func.name(), builtin_func),
+                _ => panic!(),
+            }
         }
         Interpreter {
             globals: Rc::new(RefCell::new(globals)),

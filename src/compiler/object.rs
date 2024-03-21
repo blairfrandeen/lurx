@@ -82,6 +82,7 @@ impl Display for LoxValue {
             LoxValue::Nil => write!(f, "Nil")?,
             LoxValue::Callable(callable) => match callable {
                 Callable::Function { name, .. } => write!(f, "<function {}>", name)?,
+                Callable::BuiltIn { name, .. } => write!(f, "<builtin function {}>", name)?,
             },
         }
         Ok(())
