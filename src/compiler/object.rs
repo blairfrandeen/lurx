@@ -25,10 +25,8 @@ impl LoxValue {
         statements: Stmt,
         environment: Rc<RefCell<Environment>>,
     ) -> Self {
-        let arity = parameters.len() as u8; // TODO: Check for too many params
         LoxValue::Callable(
             Callable::Function {
-                arity,
                 name,
                 parameters,
                 statements,

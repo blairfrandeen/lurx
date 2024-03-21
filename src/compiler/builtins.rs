@@ -18,7 +18,6 @@ fn clock() -> LoxValue {
     let name = Token::identifier("clock".to_string());
     LoxValue::Callable(
         Callable::BuiltIn {
-            arity: 0,
             name,
             parameters: vec![],
             function: clock_impl,

@@ -11,13 +11,11 @@ use std::{cell::RefCell, rc::Rc};
 #[derive(Debug, PartialEq, Clone)]
 pub enum Callable {
     Function {
-        arity: u8,
         name: Token,
         parameters: Vec<Token>,
         statements: Stmt,
     },
     BuiltIn {
-        arity: u8,
         name: Token,
         parameters: Vec<LoxValue>,
         function: fn(&[LoxValue]) -> LoxValue,
@@ -32,10 +30,10 @@ impl Callable {
         }
     }
 
-    pub fn arity(&self) -> u8 {
+    pub fn arity(&self) -> usize {
         match &self {
-            Callable::Function { arity, .. } => *arity,
-            Callable::BuiltIn { arity, .. } => *arity,
+            Callable::Function { parameters, .. } => parameters.len(),
+            Callable::BuiltIn { parameters, .. } => parameters.len(),
         }
     }
 
@@ -45,7 +43,7 @@ impl Callable {
         environment: Rc<RefCell<Environment>>,
         args: Vec<Expr>,
     ) -> Result<LoxValue, RuntimeError> {
-        if args.len() as u8 != self.arity() {
+        if args.len() != self.arity() {
             panic!("Incorrect number of arguments!");
             // TODO: Runtime error for incorrect # of args
         }
