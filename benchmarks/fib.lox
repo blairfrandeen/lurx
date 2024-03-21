@@ -1,0 +1,13 @@
+fun fib(n) {
+  if (n <= 1) { return n; }
+  return fib(n - 2) + fib(n - 1);
+}
+
+var n = 25;
+var t_start = clock();
+fib(n);
+var t_end = clock();
+print "Fibonacci benchmark. n = ";
+print n;
+print "Time to complete (seconds): ";
+print t_end - t_start;
