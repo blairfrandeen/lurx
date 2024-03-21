@@ -8,13 +8,13 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub fn builtins() -> Vec<LoxValue> {
+pub fn builtins(env: Rc<RefCell<Environment>>) -> Vec<LoxValue> {
     let mut builtin_vec = Vec::new();
-    builtin_vec.push(clock());
+    builtin_vec.push(clock(env.clone()));
     builtin_vec
 }
 
-fn clock() -> LoxValue {
+fn clock(env: Rc<RefCell<Environment>>) -> LoxValue {
     let name = Token::identifier("clock".to_string());
     LoxValue::Callable(
         Callable::BuiltIn {
@@ -22,7 +22,7 @@ fn clock() -> LoxValue {
             parameters: vec![],
             function: clock_impl,
         },
-        Rc::new(RefCell::new(Environment::new())),
+        env,
     )
 }
 

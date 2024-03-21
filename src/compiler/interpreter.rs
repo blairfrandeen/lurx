@@ -57,15 +57,17 @@ impl Interpreter {
     }
 
     pub fn new() -> Self {
-        let mut globals = Environment::new();
-        for builtin_func in builtins().into_iter() {
+        let globals = Rc::new(RefCell::new(Environment::new()));
+        for builtin_func in builtins(globals.clone()).into_iter() {
             match builtin_func {
-                LoxValue::Callable(ref func, _) => globals.set(&func.name(), builtin_func),
+                LoxValue::Callable(ref func, _) => {
+                    globals.borrow_mut().set(&func.name(), builtin_func)
+                }
                 _ => panic!(),
             }
         }
         Interpreter {
-            globals: Rc::new(RefCell::new(globals)),
+            globals,
             out: vec![],
             flush: false,
             print_expr: false,
@@ -112,9 +114,7 @@ impl Interpreter {
                 match initializer {
                     Some(init) => {
                         let assignment = self.evaluate(init, environment.clone())?;
-                        // dbg!(&assignment);
                         environment.borrow_mut().set(name, assignment);
-                        // dbg!(&environment);
                     }
                     None => environment.borrow_mut().set(name, LoxValue::Nil),
                 }
@@ -125,7 +125,6 @@ impl Interpreter {
                 parameters,
                 statements,
             } => {
-                let closure = environment.clone();
                 environment.borrow_mut().set(
                     name,
                     LoxValue::Callable(
@@ -134,7 +133,7 @@ impl Interpreter {
                             parameters: parameters.clone(),
                             statements: *statements.clone(),
                         },
-                        closure,
+                        environment.clone(),
                     ),
                 );
                 Ok(())

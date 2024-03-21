@@ -43,10 +43,6 @@ impl Callable {
         environment: Rc<RefCell<Environment>>,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, RuntimeError> {
-        if args.len() != self.arity() {
-            panic!("Incorrect number of arguments!");
-            // TODO: Runtime error for incorrect # of args
-        }
         match &self {
             Callable::Function {
                 parameters,
