@@ -1,6 +1,12 @@
-use crate::compiler::{function::Callable, lexer::Token, parser::Stmt, LoxFloat};
+use crate::compiler::{
+    environment::Environment, function::Callable, lexer::Token, parser::Stmt, LoxFloat,
+};
 
-use std::fmt::{Display, Formatter};
+use std::{
+    cell::RefCell,
+    fmt::{Display, Formatter},
+    rc::Rc,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LoxValue {
@@ -9,18 +15,26 @@ pub enum LoxValue {
     True,
     False,
     Nil,
-    Callable(Callable),
+    Callable(Callable, Rc<RefCell<Environment>>),
 }
 
 impl LoxValue {
-    pub fn function(name: Token, parameters: Vec<Token>, statements: Stmt) -> Self {
+    pub fn function(
+        name: Token,
+        parameters: Vec<Token>,
+        statements: Stmt,
+        environment: Rc<RefCell<Environment>>,
+    ) -> Self {
         let arity = parameters.len() as u8; // TODO: Check for too many params
-        LoxValue::Callable(Callable::Function {
-            arity,
-            name,
-            parameters,
-            statements,
-        })
+        LoxValue::Callable(
+            Callable::Function {
+                arity,
+                name,
+                parameters,
+                statements,
+            },
+            environment,
+        )
     }
 }
 
@@ -80,7 +94,7 @@ impl Display for LoxValue {
             LoxValue::True => write!(f, "True")?,
             LoxValue::False => write!(f, "False")?,
             LoxValue::Nil => write!(f, "Nil")?,
-            LoxValue::Callable(callable) => match callable {
+            LoxValue::Callable(callable, _) => match callable {
                 Callable::Function { name, .. } => write!(f, "<function {}>", name)?,
                 Callable::BuiltIn { name, .. } => write!(f, "<builtin function {}>", name)?,
             },

@@ -1,6 +1,12 @@
-use crate::compiler::{function::Callable, lexer::Token, object::LoxValue, LoxFloat};
+use crate::compiler::{
+    environment::Environment, function::Callable, lexer::Token, object::LoxValue, LoxFloat,
+};
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub fn builtins() -> Vec<LoxValue> {
     let mut builtin_vec = Vec::new();
@@ -10,12 +16,15 @@ pub fn builtins() -> Vec<LoxValue> {
 
 fn clock() -> LoxValue {
     let name = Token::identifier("clock".to_string());
-    LoxValue::Callable(Callable::BuiltIn {
-        arity: 0,
-        name,
-        parameters: vec![],
-        function: clock_impl,
-    })
+    LoxValue::Callable(
+        Callable::BuiltIn {
+            arity: 0,
+            name,
+            parameters: vec![],
+            function: clock_impl,
+        },
+        Rc::new(RefCell::new(Environment::new())),
+    )
 }
 
 fn clock_impl(_args: &[LoxValue]) -> LoxValue {

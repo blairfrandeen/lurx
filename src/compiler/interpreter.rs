@@ -59,7 +59,7 @@ impl Interpreter {
         let mut globals = Environment::new();
         for builtin_func in builtins().into_iter() {
             match builtin_func {
-                LoxValue::Callable(ref func) => globals.set(&func.name(), builtin_func),
+                LoxValue::Callable(ref func, _) => globals.set(&func.name(), builtin_func),
                 _ => panic!(),
             }
         }
@@ -126,7 +126,12 @@ impl Interpreter {
             } => {
                 environment.borrow_mut().set(
                     name,
-                    LoxValue::function(name.clone(), parameters.clone(), *statements.clone()),
+                    LoxValue::function(
+                        name.clone(),
+                        parameters.clone(),
+                        *statements.clone(),
+                        environment.clone(),
+                    ),
                 );
                 Ok(())
             }
@@ -210,8 +215,8 @@ impl Interpreter {
                 paren: _,
             } => {
                 let callee_obj = self.evaluate(callee, environment.clone())?;
-                let callable = match callee_obj {
-                    LoxValue::Callable(clbe) => clbe,
+                let (callable, closure) = match callee_obj {
+                    LoxValue::Callable(clbe, closure) => (clbe, closure),
                     _ => panic!("{:?} is not callable!", callee_obj),
                     // TODO: Runtime error if not callable
                 };

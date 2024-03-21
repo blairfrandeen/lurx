@@ -6,7 +6,7 @@ use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
 use crate::compiler::object::LoxValue;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
     pub data: HashMap<String, LoxValue>,
     pub enclosing: Option<Rc<RefCell<Environment>>>,
