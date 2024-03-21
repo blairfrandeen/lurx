@@ -75,7 +75,11 @@ impl Callable {
                     },
                 }
             }
-            Callable::BuiltIn { .. } => todo!(),
+            Callable::BuiltIn {
+                parameters,
+                function,
+                ..
+            } => Ok(function(parameters)),
         }
     }
 }
