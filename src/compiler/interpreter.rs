@@ -975,6 +975,17 @@ mod tests {
     }
 
     #[test]
+    fn fib_fun_recursive() {
+        assert_eq!(
+            fun_fixt(
+                "fun fib(n) { if (n <= 1) return n; return fib(n-2) + fib(n-1); }",
+                vec![LoxValue::Number(9.0)]
+            ),
+            Ok(LoxValue::Number(34.0))
+        );
+    }
+
+    #[test]
     fn fun_add() {
         assert_eq!(
             fun_fixt(
