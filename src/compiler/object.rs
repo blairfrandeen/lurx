@@ -13,7 +13,7 @@ pub enum LoxValue {
     True,
     False,
     Nil,
-    Callable(Callable, Rc<RefCell<Environment>>),
+    Callable(Callable, Option<Rc<RefCell<Environment>>>),
 }
 
 impl PartialOrd for LoxValue {

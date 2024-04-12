@@ -40,7 +40,7 @@ impl Callable {
     pub fn call(
         &self,
         interpreter: &mut Interpreter,
-        environment: Rc<RefCell<Environment>>,
+        environment: Option<Rc<RefCell<Environment>>>,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, RuntimeError> {
         match &self {
@@ -49,7 +49,10 @@ impl Callable {
                 statements,
                 ..
             } => {
-                let mut env = Environment::enclosed(environment.clone());
+                let mut env = match environment {
+                    Some(env) => Environment::enclosed(env.clone()),
+                    None => interpreter.globals.borrow().clone(),
+                };
                 for arg in std::iter::zip(parameters, args) {
                     // TODO: Consider evaluating all arguments individually
                     // BEFORE setting them in the environment?

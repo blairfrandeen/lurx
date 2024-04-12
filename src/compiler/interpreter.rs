@@ -35,7 +35,7 @@ pub enum RuntimeError {
 }
 
 pub struct Interpreter {
-    globals: Rc<RefCell<Environment>>,
+    pub globals: Rc<RefCell<Environment>>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -133,7 +133,7 @@ impl Interpreter {
                             parameters: parameters.clone(),
                             statements: *statements.clone(),
                         },
-                        environment.clone(),
+                        Some(environment.clone()),
                     ),
                 );
                 Ok(())

@@ -10,11 +10,11 @@ use std::{
 
 pub fn builtins(env: Rc<RefCell<Environment>>) -> Vec<LoxValue> {
     let mut builtin_vec = Vec::new();
-    builtin_vec.push(clock(env.clone()));
+    builtin_vec.push(clock());
     builtin_vec
 }
 
-fn clock(env: Rc<RefCell<Environment>>) -> LoxValue {
+fn clock() -> LoxValue {
     let name = Token::identifier("clock".to_string());
     LoxValue::Callable(
         Callable::BuiltIn {
@@ -22,7 +22,7 @@ fn clock(env: Rc<RefCell<Environment>>) -> LoxValue {
             parameters: vec![],
             function: clock_impl,
         },
-        env,
+        None,
     )
 }
 
