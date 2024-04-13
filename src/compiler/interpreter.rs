@@ -30,12 +30,12 @@ pub enum RuntimeError {
     },
     NameError(Token),
     Break,
-    Return(Expr),
+    Return(LoxValue),
     NotImplemented,
 }
 
 pub struct Interpreter {
-    globals: Rc<RefCell<Environment>>,
+    pub globals: Rc<RefCell<Environment>>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -58,7 +58,7 @@ impl Interpreter {
 
     pub fn new() -> Self {
         let globals = Rc::new(RefCell::new(Environment::new()));
-        for builtin_func in builtins(globals.clone()).into_iter() {
+        for builtin_func in builtins().into_iter() {
             match builtin_func {
                 LoxValue::Callable(ref func, _) => {
                     globals.borrow_mut().set(&func.name(), builtin_func)
@@ -133,7 +133,7 @@ impl Interpreter {
                             parameters: parameters.clone(),
                             statements: *statements.clone(),
                         },
-                        environment.clone(),
+                        Some(environment.clone()),
                     ),
                 );
                 Ok(())
@@ -187,7 +187,9 @@ impl Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Break),
-            Stmt::Return(expr) => Err(RuntimeError::Return(expr.clone())),
+            Stmt::Return(expr) => Err(RuntimeError::Return(
+                self.evaluate(expr, environment.clone())?,
+            )),
         }
     }
 
@@ -878,6 +880,26 @@ mod tests {
     }
 
     #[test]
+    fn counter() {
+        let counter = std::fs::read_to_string("tests/counter.lox").expect("file should exist");
+        test_output(counter.as_str(), "1\n2\n")
+    }
+
+    #[ignore = "chapter 10 challenge"]
+    #[test]
+    fn anonymous_func() {
+        let anon = std::fs::read_to_string("tests/anonymous_func.lox").expect("file should exist");
+        test_output(anon.as_str(), "it's a beautiful day!\n")
+    }
+
+    #[ignore = "chapter 10 challenge"]
+    #[test]
+    fn thrice_anonymous_func() {
+        let thrice = std::fs::read_to_string("tests/thrice.lox").expect("file should exist");
+        test_output(thrice.as_str(), "1\n2\n3\n")
+    }
+
+    #[test]
     fn test_cond_true() {
         // most basic conditional
         test_output("if (true) print 1;", "1\n");
@@ -977,6 +999,7 @@ mod tests {
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
+        assert!(&program.errors.is_empty());
         let mut interp = interpreter::Interpreter::new();
         interp.set_flush(false);
         interp.run(&program);

@@ -335,9 +335,7 @@ pub fn scan_source(source: &String) -> Result<Vec<Token>, ScanError> {
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match &self.type_ {
-            TokenType::IDENTIFIER => {
-                write!(f, "{:?} ({})", self.type_, self.literal.as_ref().unwrap())?
-            }
+            TokenType::IDENTIFIER => write!(f, "{}", self.literal.as_ref().unwrap())?,
             _ => match &self.literal {
                 Some(lit) => write!(f, "{:?} ({})", self.type_, lit)?,
                 None => write!(f, "{:?}", self.type_)?,

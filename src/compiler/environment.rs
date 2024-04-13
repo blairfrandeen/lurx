@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 use crate::compiler::interpreter::RuntimeError;
 use crate::compiler::lexer::{Literal, Token};
 use crate::compiler::object::LoxValue;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Environment {
     pub data: HashMap<String, LoxValue>,
     pub enclosing: Option<Rc<RefCell<Environment>>>,
@@ -64,6 +65,35 @@ impl Environment {
             Literal::Ident(id) => id.to_string(),
             _ => panic!("Attempt to get name from invalid token type!"),
         }
+    }
+}
+impl Debug for Environment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.fmt_with_indent(0))
+    }
+}
+
+impl Environment {
+    fn fmt_with_indent(&self, indent_level: usize) -> String {
+        let indent = "  ".repeat(indent_level);
+        let mut data_string = String::new();
+        if !self.data.is_empty() {
+            data_string.push('\n');
+            for key in self.data.keys() {
+                let val = self.data.get(key).unwrap();
+                data_string = format!("{data_string}{indent}  {key:<12} {val}\n")
+            }
+        } else {
+            data_string = "None".to_string();
+        }
+        let enc_string = match &self.enclosing {
+            Some(enc) => format!("{}", enc.borrow().fmt_with_indent(indent_level + 1)),
+            None => "None".to_string(),
+        };
+        format!(
+            "{}Environment: \n{}data: {}\n{}enclosing: {}",
+            indent, indent, data_string, indent, enc_string,
+        )
     }
 }
 

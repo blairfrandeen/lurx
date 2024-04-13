@@ -40,7 +40,7 @@ impl Callable {
     pub fn call(
         &self,
         interpreter: &mut Interpreter,
-        environment: Rc<RefCell<Environment>>,
+        environment: Option<Rc<RefCell<Environment>>>,
         args: Vec<LoxValue>,
     ) -> Result<LoxValue, RuntimeError> {
         match &self {
@@ -49,21 +49,21 @@ impl Callable {
                 statements,
                 ..
             } => {
-                let mut env = Environment::enclosed(environment.clone());
+                let call_env_rc = Rc::new(RefCell::new(match environment {
+                    Some(env) => Environment::enclosed(env),
+                    None => interpreter.globals.borrow().clone(),
+                }));
                 for arg in std::iter::zip(parameters, args) {
                     // TODO: Consider evaluating all arguments individually
                     // BEFORE setting them in the environment?
-                    env.set(&arg.0, arg.1);
+                    call_env_rc.borrow_mut().set(&arg.0, arg.1);
                 }
-                match interpreter
-                    .execute_block(vec![statements.clone()], Rc::new(RefCell::new(env.clone())))
-                {
+                let result =
+                    interpreter.execute_block(vec![statements.clone()], call_env_rc.clone());
+                match result {
                     Ok(_) => Ok(LoxValue::Nil),
                     Err(err) => match err {
-                        RuntimeError::Return(expr) => {
-                            let retval = interpreter.evaluate(&expr, Rc::new(RefCell::new(env)))?;
-                            Ok(retval)
-                        }
+                        RuntimeError::Return(retval) => Ok(retval),
                         _ => Err(err),
                     },
                 }
