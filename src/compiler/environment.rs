@@ -15,7 +15,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        match self.data.get(&name.ident()) {
+        match self.data.get(name.ident()) {
             Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
                 Some(enc) => enc.borrow().get(&name),
@@ -25,14 +25,14 @@ impl Environment {
     }
 
     pub fn set(&mut self, name: &Token, value: LoxValue) {
-        let _ = &self.data.insert(name.ident(), value);
+        let _ = &self.data.insert(name.ident().to_string(), value);
     }
 
     pub fn update(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
-        let has_key = &self.data.contains_key(&name.ident());
+        let has_key = &self.data.contains_key(name.ident());
         match has_key {
             true => {
-                let _ = &self.data.insert(name.ident(), value);
+                let _ = &self.data.insert(name.ident().to_string(), value);
                 Ok(())
             }
             false => match &mut self.enclosing {

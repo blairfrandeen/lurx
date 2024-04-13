@@ -147,13 +147,13 @@ impl Token {
 
     /// For an IDENTIFIER token, get the name of the identifier.
     /// Panic if called on a non-identifier token.
-    pub fn ident(&self) -> String {
+    pub fn ident(&self) -> &String {
         match &self
             .literal
             .as_ref()
             .expect("Attempt to get name from invalid token type!")
         {
-            Literal::Ident(id) => id.to_string(),
+            Literal::Ident(id) => id,
             _ => panic!("Attempt to get name from invalid token type!"),
         }
     }
