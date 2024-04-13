@@ -12,8 +12,10 @@ struct Resolver {
 }
 
 impl Resolver {
-    pub fn resolve(&self, statements: Vec<Stmt>) {
-        todo!();
+    pub fn resolve(&mut self, statements: Vec<Stmt>) {
+        for stmt in statements.iter() {
+            self.resolve_stmt(stmt);
+        }
     }
 
     pub fn resolve_stmt(&mut self, statement: &Stmt) {
@@ -43,6 +45,7 @@ impl Resolver {
             } => {
                 self.declare(name);
                 self.define(name);
+                // TODO: Separate function form here to next comment when we do classes
                 self.begin_scope();
                 for param in parameters.iter() {
                     self.declare(param);
@@ -50,8 +53,30 @@ impl Resolver {
                 }
                 self.resolve_stmt(statements);
                 self.end_scope();
+                // kend private function
             }
-            _ => todo!(),
+            Stmt::Conditional {
+                condition,
+                true_branch,
+                false_branch,
+            } => {
+                self.resolve_expr(condition);
+                self.resolve_stmt(true_branch);
+                match false_branch {
+                    Some(statement) => self.resolve_stmt(statement),
+                    None => {}
+                }
+            }
+            Stmt::Print(expr) => self.resolve_expr(expr),
+            Stmt::Return(expr) => self.resolve_expr(expr),
+            Stmt::WhileLoop {
+                condition,
+                statements,
+            } => {
+                self.resolve_expr(condition);
+                self.resolve_stmt(statements);
+            }
+            Stmt::Break => {}
         }
     }
 
@@ -71,7 +96,25 @@ impl Resolver {
                 self.resolve_expr(value);
                 self.resolve_local(expression, name.ident());
             }
-            _ => todo!(),
+            Expr::Binary { left, right, .. } => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+            }
+            Expr::Call {
+                callee, arguments, ..
+            } => {
+                self.resolve_expr(callee);
+                for arg in arguments.iter() {
+                    self.resolve_expr(arg);
+                }
+            }
+            Expr::Grouping(group) => self.resolve_expr(group),
+            Expr::Literal(_) => {}
+            Expr::Logical { left, right, .. } => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+            }
+            Expr::Unary { right, .. } => self.resolve_expr(right),
         }
     }
 
