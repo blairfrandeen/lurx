@@ -900,6 +900,13 @@ mod tests {
     }
 
     #[test]
+    fn static_scope() {
+        let static_scope =
+            std::fs::read_to_string("tests/static_scope.lox").expect("file should exist");
+        test_output(static_scope.as_str(), "global\nglobal\n")
+    }
+
+    #[test]
     fn test_cond_true() {
         // most basic conditional
         test_output("if (true) print 1;", "1\n");
