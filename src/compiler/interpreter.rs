@@ -30,7 +30,7 @@ pub enum RuntimeError {
     },
     NameError(Token),
     Break,
-    Return(Expr),
+    Return(LoxValue),
     NotImplemented,
 }
 
@@ -58,7 +58,7 @@ impl Interpreter {
 
     pub fn new() -> Self {
         let globals = Rc::new(RefCell::new(Environment::new()));
-        for builtin_func in builtins(globals.clone()).into_iter() {
+        for builtin_func in builtins().into_iter() {
             match builtin_func {
                 LoxValue::Callable(ref func, _) => {
                     globals.borrow_mut().set(&func.name(), builtin_func)
@@ -187,7 +187,9 @@ impl Interpreter {
                 Ok(())
             }
             Stmt::Break => Err(RuntimeError::Break),
-            Stmt::Return(expr) => Err(RuntimeError::Return(expr.clone())),
+            Stmt::Return(expr) => Err(RuntimeError::Return(
+                self.evaluate(expr, environment.clone())?,
+            )),
         }
     }
 
@@ -875,6 +877,12 @@ mod tests {
     fn test_is_even() {
         let iseven = std::fs::read_to_string("tests/iseven.lox").expect("file should exist");
         test_output(iseven.as_str(), "True\nFalse\n")
+    }
+
+    #[test]
+    fn counter() {
+        let counter = std::fs::read_to_string("tests/counter.lox").expect("file should exist");
+        test_output(counter.as_str(), "1\n2\n")
     }
 
     #[test]

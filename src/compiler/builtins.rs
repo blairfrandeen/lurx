@@ -1,14 +1,8 @@
-use crate::compiler::{
-    environment::Environment, function::Callable, lexer::Token, object::LoxValue, LoxFloat,
-};
+use crate::compiler::{function::Callable, lexer::Token, object::LoxValue, LoxFloat};
 
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn builtins(env: Rc<RefCell<Environment>>) -> Vec<LoxValue> {
+pub fn builtins() -> Vec<LoxValue> {
     let mut builtin_vec = Vec::new();
     builtin_vec.push(clock());
     builtin_vec
