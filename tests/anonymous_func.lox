@@ -1,0 +1,8 @@
+fun callFun(callee) {
+print "calling";
+	callee();
+}
+
+callFun(fun () { 
+	print "it's a beautiful day!"; 
+});

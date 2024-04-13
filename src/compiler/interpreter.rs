@@ -885,6 +885,20 @@ mod tests {
         test_output(counter.as_str(), "1\n2\n")
     }
 
+    #[ignore = "chapter 10 challenge"]
+    #[test]
+    fn anonymous_func() {
+        let anon = std::fs::read_to_string("tests/anonymous_func.lox").expect("file should exist");
+        test_output(anon.as_str(), "it's a beautiful day!\n")
+    }
+
+    #[ignore = "chapter 10 challenge"]
+    #[test]
+    fn thrice_anonymous_func() {
+        let thrice = std::fs::read_to_string("tests/thrice.lox").expect("file should exist");
+        test_output(thrice.as_str(), "1\n2\n3\n")
+    }
+
     #[test]
     fn test_cond_true() {
         // most basic conditional
@@ -985,6 +999,7 @@ mod tests {
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
+        assert!(&program.errors.is_empty());
         let mut interp = interpreter::Interpreter::new();
         interp.set_flush(false);
         interp.run(&program);
