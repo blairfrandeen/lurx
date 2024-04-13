@@ -6,13 +6,25 @@ use crate::compiler::{
     parser::{Expr, Stmt},
 };
 
-struct Resolver {
-    interpreter: Interpreter,
+pub enum ResolverError {}
+
+pub struct Resolver<'a> {
+    pub interpreter: &'a Interpreter,
+    pub errors: Vec<ResolverError>,
     scopes: Vec<RefCell<HashMap<String, bool>>>,
 }
 
-impl Resolver {
-    pub fn resolve(&mut self, statements: Vec<Stmt>) {
+impl<'a> Resolver<'a> {
+    pub fn new(interpreter: &'a Interpreter) -> Self {
+        Resolver {
+            interpreter,
+            scopes: vec![],
+            errors: vec![],
+        }
+    }
+
+    pub fn resolve(&mut self, statements: &Vec<Stmt>) {
+        self.begin_scope();
         for stmt in statements.iter() {
             self.resolve_stmt(stmt);
         }
@@ -83,7 +95,7 @@ impl Resolver {
     pub fn resolve_expr(&mut self, expression: &Expr) {
         match expression {
             Expr::Variable(var) => {
-                match &self.scopes.last() {
+                match &self.scopes.first() {
                     Some(scope) => match scope.borrow().get(var.ident()) {
                         Some(_) => {},
                         None => todo!("Need proper error hanLIng for reading local variable within its own initializer"),
@@ -118,9 +130,7 @@ impl Resolver {
         }
     }
 
-    fn resolve_local(&mut self, expression: &Expr, name: &String) {
-        todo!()
-    }
+    fn resolve_local(&mut self, expression: &Expr, name: &String) {}
 
     fn begin_scope(&mut self) {
         let _ = &self.scopes.push(RefCell::new(HashMap::new()));
@@ -131,16 +141,16 @@ impl Resolver {
     }
 
     fn declare(&self, name: &Token) {
-        match self.scopes.last() {
+        match self.scopes.first() {
             Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), false),
             None => return,
         };
     }
 
     fn define(&self, name: &Token) {
-        match self.scopes.last() {
+        match self.scopes.first() {
             Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), true),
-            None => panic!("Attempt to define undeclared name: {}", name.ident()),
+            None => return, //panic!("Attempt to define undeclared name: {}", name.ident()),
         };
     }
 }

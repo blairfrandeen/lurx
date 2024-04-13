@@ -6,6 +6,7 @@ use crate::compiler::{
     lexer::{Literal, Token, TokenType},
     object::LoxValue,
     parser::{Expr, Program, Stmt},
+    resolver::Resolver,
 };
 
 use std::cell::RefCell;
@@ -1008,6 +1009,9 @@ mod tests {
         let program = parser::program(tokens, source.to_string());
         assert!(&program.errors.is_empty());
         let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&interp);
+        res.resolve(&program.statements);
+        assert!(res.errors.is_empty());
         interp.set_flush(false);
         interp.run(&program);
         assert_eq!(interp.out, expected.as_bytes());
@@ -1060,6 +1064,9 @@ mod tests {
         let tokens = lexer::scan_source(&fn_decl.to_string()).unwrap();
         let program = parser::program(tokens, fn_decl.to_string());
         let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&interp);
+        res.resolve(&program.statements);
+        assert!(res.errors.is_empty());
         interp.set_flush(false);
         interp.run(&program);
 

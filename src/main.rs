@@ -1,11 +1,11 @@
 pub mod compiler;
 
-use clap::Parser;
-use compiler::errors::ErrorReport;
-use compiler::{interpreter, lexer, parser};
+use std::{fs, path::PathBuf};
 
-use std::fs;
-use std::path::PathBuf;
+use clap::Parser;
+use rustyline;
+
+use compiler::{errors::ErrorReport, interpreter, lexer, parser, resolver};
 
 /// A Lox Implementation in Rust
 #[derive(Parser, Debug)]
@@ -52,16 +52,18 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter, show_ast: boo
     if show_ast {
         dbg!(&program);
     }
-    if program.errors.is_empty() {
-        interp.run(&program);
-        interp.flush();
-    } else {
+    if !program.errors.is_empty() {
         for error in program.errors.iter() {
             error.report(&source);
         }
+        return;
     }
+    let mut res = resolver::Resolver::new(&interp);
+    res.resolve(&program.statements);
+
+    interp.run(&program);
+    interp.flush();
 }
-use rustyline;
 fn repl() -> rustyline::Result<()> {
     let mut interp = interpreter::Interpreter::new();
     interp.set_print_expr(true);
