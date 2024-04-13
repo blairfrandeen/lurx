@@ -144,6 +144,19 @@ impl Token {
         let results = scan_source(&source.to_string()).expect("Invalid Token!");
         results.get(0).expect("No tokens found!").to_owned()
     }
+
+    /// For an IDENTIFIER token, get the name of the identifier.
+    /// Panic if called on a non-identifier token.
+    pub fn ident(&self) -> String {
+        match &self
+            .literal
+            .as_ref()
+            .expect("Attempt to get name from invalid token type!")
+        {
+            Literal::Ident(id) => id.to_string(),
+            _ => panic!("Attempt to get name from invalid token type!"),
+        }
+    }
 }
 
 impl Default for Token {

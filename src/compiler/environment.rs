@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 use crate::compiler::interpreter::RuntimeError;
-use crate::compiler::lexer::{Literal, Token};
+use crate::compiler::lexer::Token;
 use crate::compiler::object::LoxValue;
 
 #[derive(PartialEq, Clone)]
@@ -15,7 +15,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        match self.data.get(&Self::get_ident(&name)) {
+        match self.data.get(&name.ident()) {
             Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
                 Some(enc) => enc.borrow().get(&name),
@@ -25,14 +25,14 @@ impl Environment {
     }
 
     pub fn set(&mut self, name: &Token, value: LoxValue) {
-        let _ = &self.data.insert(Self::get_ident(&name), value);
+        let _ = &self.data.insert(name.ident(), value);
     }
 
     pub fn update(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
-        let has_key = &self.data.contains_key(&Self::get_ident(&name));
+        let has_key = &self.data.contains_key(&name.ident());
         match has_key {
             true => {
-                let _ = &self.data.insert(Self::get_ident(&name), value);
+                let _ = &self.data.insert(name.ident(), value);
                 Ok(())
             }
             false => match &mut self.enclosing {
@@ -53,17 +53,6 @@ impl Environment {
         Environment {
             data: HashMap::new(),
             enclosing: Some(enclosing),
-        }
-    }
-
-    fn get_ident(name: &Token) -> String {
-        match name
-            .literal
-            .as_ref()
-            .expect("Attempt to get name from invalid token type!")
-        {
-            Literal::Ident(id) => id.to_string(),
-            _ => panic!("Attempt to get name from invalid token type!"),
         }
     }
 }
