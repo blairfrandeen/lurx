@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types, unused)]
-use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+};
 
 use thiserror::Error;
 
@@ -106,6 +109,14 @@ pub struct Token {
     pub loc: (usize, usize),
     pub literal: Option<Literal>,
 }
+
+use std::hash::{Hash, Hasher};
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.loc.hash(state);
+    }
+}
+
 
 /// Convenience / helper functions for quickly creating tokens for use in testing
 impl Token {
@@ -390,6 +401,8 @@ impl PartialEq for Token {
         (self.type_ == other.type_) & (self.literal == other.literal)
     }
 }
+
+impl Eq for Token {}
 
 /// for testing purposes
 pub fn token_iter(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {

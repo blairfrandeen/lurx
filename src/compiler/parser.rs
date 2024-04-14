@@ -60,7 +60,7 @@ pub enum Stmt {
     Return(Expr),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Expr {
     Literal(Token),
     Unary {
