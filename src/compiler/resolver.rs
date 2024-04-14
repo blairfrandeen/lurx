@@ -6,7 +6,10 @@ use crate::compiler::{
     parser::{Expr, Stmt},
 };
 
-pub enum ResolverError {}
+#[derive(Debug)]
+pub enum ResolverError {
+    OwnInitializer(Token),
+}
 
 pub struct Resolver<'a> {
     pub interpreter: &'a Interpreter,
@@ -24,31 +27,34 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn resolve(&mut self, statements: &Vec<Stmt>) {
-        self.begin_scope();
+        self.begin_scope(); // TODO: this line shouldn't have to be here?
         for stmt in statements.iter() {
-            self.resolve_stmt(stmt);
+            match self.resolve_stmt(stmt) {
+                Ok(_) => {}
+                Err(err) => self.errors.push(err),
+            }
         }
     }
 
-    pub fn resolve_stmt(&mut self, statement: &Stmt) {
+    pub fn resolve_stmt(&mut self, statement: &Stmt) -> Result<(), ResolverError> {
         match statement {
             Stmt::Block(stmts) => {
                 self.begin_scope();
                 for stmt in stmts.iter() {
-                    self.resolve_stmt(stmt);
+                    self.resolve_stmt(stmt)?;
                 }
                 self.end_scope();
             }
             Stmt::VarDecl { name, initializer } => {
                 self.declare(name);
                 match initializer {
-                    Some(expr) => self.resolve_expr(expr),
+                    Some(expr) => self.resolve_expr(expr)?,
                     None => {}
                 };
                 self.define(name);
             }
             Stmt::Expression(expr) => {
-                self.resolve_expr(expr);
+                self.resolve_expr(expr)?;
             }
             Stmt::FunDecl {
                 name,
@@ -63,7 +69,7 @@ impl<'a> Resolver<'a> {
                     self.declare(param);
                     self.define(param);
                 }
-                self.resolve_stmt(statements);
+                self.resolve_stmt(statements)?;
                 self.end_scope();
                 // kend private function
             }
@@ -72,62 +78,64 @@ impl<'a> Resolver<'a> {
                 true_branch,
                 false_branch,
             } => {
-                self.resolve_expr(condition);
-                self.resolve_stmt(true_branch);
+                self.resolve_expr(condition)?;
+                self.resolve_stmt(true_branch)?;
                 match false_branch {
-                    Some(statement) => self.resolve_stmt(statement),
+                    Some(statement) => self.resolve_stmt(statement)?,
                     None => {}
                 }
             }
-            Stmt::Print(expr) => self.resolve_expr(expr),
-            Stmt::Return(expr) => self.resolve_expr(expr),
+            Stmt::Print(expr) => self.resolve_expr(expr)?,
+            Stmt::Return(expr) => self.resolve_expr(expr)?,
             Stmt::WhileLoop {
                 condition,
                 statements,
             } => {
-                self.resolve_expr(condition);
-                self.resolve_stmt(statements);
+                self.resolve_expr(condition)?;
+                self.resolve_stmt(statements)?;
             }
             Stmt::Break => {}
-        }
+        };
+        Ok(())
     }
 
-    pub fn resolve_expr(&mut self, expression: &Expr) {
+    pub fn resolve_expr(&mut self, expression: &Expr) -> Result<(), ResolverError> {
         match expression {
             Expr::Variable(var) => {
                 match &self.scopes.first() {
                     Some(scope) => match scope.borrow().get(var.ident()) {
-                        Some(_) => {},
-                        None => todo!("Need proper error hanLIng for reading local variable within its own initializer"),
-                    }
-                    None => {},
+                        Some(_) => {}
+                        None => return Err(ResolverError::OwnInitializer(var.clone())),
+                    },
+                    None => {}
                 }
                 self.resolve_local(expression, &var.ident());
             }
             Expr::Assign { name, value } => {
-                self.resolve_expr(value);
+                self.resolve_expr(value)?;
                 self.resolve_local(expression, name.ident());
             }
             Expr::Binary { left, right, .. } => {
-                self.resolve_expr(left);
-                self.resolve_expr(right);
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)?;
             }
             Expr::Call {
                 callee, arguments, ..
             } => {
-                self.resolve_expr(callee);
+                self.resolve_expr(callee)?;
                 for arg in arguments.iter() {
-                    self.resolve_expr(arg);
+                    self.resolve_expr(arg)?;
                 }
             }
-            Expr::Grouping(group) => self.resolve_expr(group),
+            Expr::Grouping(group) => self.resolve_expr(group)?,
             Expr::Literal(_) => {}
             Expr::Logical { left, right, .. } => {
-                self.resolve_expr(left);
-                self.resolve_expr(right);
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)?;
             }
-            Expr::Unary { right, .. } => self.resolve_expr(right),
-        }
+            Expr::Unary { right, .. } => self.resolve_expr(right)?,
+        };
+        Ok(())
     }
 
     fn resolve_local(&mut self, expression: &Expr, name: &String) {}
