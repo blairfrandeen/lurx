@@ -27,7 +27,6 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn resolve(&mut self, statements: &Vec<Stmt>) {
-        self.begin_scope(); // TODO: this line shouldn't have to be here?
         for stmt in statements.iter() {
             match self.resolve_stmt(stmt) {
                 Ok(_) => {}
@@ -102,12 +101,12 @@ impl<'a> Resolver<'a> {
     pub fn resolve_expr(&mut self, expression: &Expr) -> Result<(), ResolverError> {
         match expression {
             Expr::Variable(var) => {
-                match &self.scopes.first() {
-                    Some(scope) => match scope.borrow().get(var.ident()) {
-                        Some(_) => {}
-                        None => return Err(ResolverError::OwnInitializer(var.clone())),
-                    },
-                    None => {}
+                if self
+                    .scopes
+                    .first()
+                    .is_some_and(|s| s.borrow().get(var.ident()).is_some_and(|t| !*t))
+                {
+                    return Err(ResolverError::OwnInitializer(var.clone()));
                 }
                 self.resolve_local(expression, &var.ident());
             }
@@ -158,7 +157,7 @@ impl<'a> Resolver<'a> {
     fn define(&self, name: &Token) {
         match self.scopes.first() {
             Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), true),
-            None => return, //panic!("Attempt to define undeclared name: {}", name.ident()),
+            None => return,
         };
     }
 }
