@@ -9,9 +9,7 @@ use crate::compiler::{
     resolver::Resolver,
 };
 
-use std::cell::RefCell;
-use std::io::Write;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -37,6 +35,7 @@ pub enum RuntimeError {
 
 pub struct Interpreter {
     pub globals: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -69,10 +68,15 @@ impl Interpreter {
         }
         Interpreter {
             globals,
+            locals: HashMap::new(),
             out: vec![],
             flush: false,
             print_expr: false,
         }
+    }
+
+    pub fn resolve(&mut self, expr: Expr, depth: usize) {
+        self.locals.insert(expr, depth);
     }
 
     pub fn flush(&mut self) {
