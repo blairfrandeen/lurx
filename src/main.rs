@@ -58,7 +58,7 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter, show_ast: boo
         }
         return;
     }
-    let mut res = resolver::Resolver::new(&interp);
+    let mut res = resolver::Resolver::new(interp);
     res.resolve(&program.statements);
 
     interp.run(&program);

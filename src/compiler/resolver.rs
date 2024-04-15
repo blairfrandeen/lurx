@@ -138,7 +138,20 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_local(&mut self, expression: &Expr, name: &String) {}
+    fn resolve_local(&mut self, expression: &Expr, name: &String) {
+        let mut i = self.scopes.len() as i32 - 1;
+        while i >= 0 {
+            if self
+                .scopes
+                .get(i as usize)
+                .is_some_and(|s| s.borrow().get(name).is_some())
+            {
+                self.interpreter
+                    .resolve(expression, self.scopes.len() - 1 - i as usize)
+            }
+            i = i - 1;
+        }
+    }
 
     fn begin_scope(&mut self) {
         let _ = &self.scopes.push(RefCell::new(HashMap::new()));

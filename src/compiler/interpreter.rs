@@ -75,8 +75,8 @@ impl Interpreter {
         }
     }
 
-    pub fn resolve(&mut self, expr: Expr, depth: usize) {
-        self.locals.insert(expr, depth);
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.clone(), depth);
     }
 
     pub fn flush(&mut self) {
@@ -146,7 +146,12 @@ impl Interpreter {
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
                     let assignment = self.evaluate(value, environment.clone())?;
-                    environment.borrow_mut().update(name, assignment)?;
+                    match self.locals.get(expr) {
+                        Some(distance) => {
+                            environment.borrow_mut().set_at(*distance, name, assignment)
+                        }
+                        None => environment.borrow_mut().update(name, assignment)?,
+                    }
                     Ok(())
                 }
                 _ => {
@@ -211,8 +216,8 @@ impl Interpreter {
                 right,
             } => self.eval_binary(left, operator, right, environment),
             Expr::Grouping(expr) => self.eval_grouping(expr, environment),
-            Expr::Literal(token) => self.eval_literal(token, environment),
-            Expr::Variable(token) => self.eval_literal(token, environment),
+            Expr::Literal(token) => self.eval_literal(token, expr, environment),
+            Expr::Variable(token) => self.eval_literal(token, expr, environment),
             Expr::Assign { name: _, value: _ } => todo!(),
             Expr::Logical {
                 left,
@@ -396,10 +401,14 @@ impl Interpreter {
     fn eval_literal(
         &mut self,
         token: &Token,
+        expr: &Expr,
         environment: Rc<RefCell<Environment>>,
     ) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => environment.borrow().get(&token),
+            TokenType::IDENTIFIER => match self.locals.get(expr) {
+                Some(distance) => Ok(environment.borrow().get_at(*distance, token)),
+                None => self.globals.borrow().get(&token),
+            },
             _ => Ok(token.value()),
         }
     }
@@ -1014,7 +1023,7 @@ mod tests {
         let program = parser::program(tokens, source.to_string());
         check_errors(&program.errors);
         let mut interp = interpreter::Interpreter::new();
-        let mut res = Resolver::new(&interp);
+        let mut res = Resolver::new(&mut interp);
         res.resolve(&program.statements);
         check_errors(&res.errors);
         interp.set_flush(false);
@@ -1086,7 +1095,7 @@ mod tests {
         let program = parser::program(tokens, fn_decl.to_string());
         check_errors(&program.errors);
         let mut interp = interpreter::Interpreter::new();
-        let mut res = Resolver::new(&interp);
+        let mut res = Resolver::new(&mut interp);
         res.resolve(&program.statements);
         check_errors(&res.errors);
         interp.set_flush(false);
