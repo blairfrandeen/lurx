@@ -6,7 +6,7 @@ use crate::compiler::{
     parser::{Expr, Stmt},
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ResolverError {
     OwnInitializer(Token),
 }
@@ -165,6 +165,21 @@ impl<'a> Resolver<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compiler::{interpreter, lexer, parser};
+
+    #[test]
+    fn own_decl_error() {
+        let source = "var a = \"init\"; {var a = a;}";
+        let tokens = lexer::scan_source(&source.to_string()).unwrap();
+        let program = parser::program(tokens, source.to_string());
+        let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        assert_eq!(
+            res.errors.first().expect("one error"),
+            &ResolverError::OwnInitializer(Token::identifier("a".to_string()))
+        )
+    }
 
     #[test]
     fn declare_define() {
