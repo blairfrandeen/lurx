@@ -24,6 +24,33 @@ impl Environment {
         }
     }
 
+    pub fn get_at(&self, distance: usize, name: &Token) -> LoxValue {
+        if distance > 0 {
+            return self
+                .enclosing
+                .clone()
+                .expect("should not be at global for get_at")
+                .borrow()
+                .get_at(distance - 1, name);
+        }
+        self.data
+            .get(name.ident())
+            .expect("value should exist")
+            .clone()
+    }
+
+    pub fn set_at(&mut self, distance: usize, name: &Token, value: LoxValue) {
+        if distance > 0 {
+            return self
+                .enclosing
+                .clone()
+                .expect("should not be at global for set_at")
+                .borrow_mut()
+                .set_at(distance - 1, name, value);
+        }
+        self.set(name, value);
+    }
+
     pub fn set(&mut self, name: &Token, value: LoxValue) {
         let _ = &self.data.insert(name.ident().to_string(), value);
     }
