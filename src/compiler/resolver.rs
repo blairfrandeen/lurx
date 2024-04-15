@@ -12,13 +12,13 @@ pub enum ResolverError {
 }
 
 pub struct Resolver<'a> {
-    pub interpreter: &'a Interpreter,
+    pub interpreter: &'a mut Interpreter,
     pub errors: Vec<ResolverError>,
     scopes: Vec<RefCell<HashMap<String, bool>>>,
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(interpreter: &'a Interpreter) -> Self {
+    pub fn new(interpreter: &'a mut Interpreter) -> Self {
         Resolver {
             interpreter,
             scopes: vec![],
@@ -159,5 +159,47 @@ impl<'a> Resolver<'a> {
             Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), true),
             None => return,
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn declare_define() {
+        let mut interp = Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        let nametok = Token::identifier("a".to_string());
+
+        // with no scope, declare & define should do nothing
+        res.declare(&nametok);
+        res.define(&nametok);
+        assert!(res.scopes.is_empty());
+
+        res.begin_scope();
+        assert_eq!(res.scopes.len(), 1);
+        res.declare(&nametok);
+        assert!(!res
+            .scopes
+            .first()
+            .expect("one scope")
+            .borrow()
+            .get(nametok.ident())
+            .expect("Name should exist"));
+        res.define(&nametok);
+        assert!(res
+            .scopes
+            .first()
+            .expect("one scope")
+            .borrow()
+            .get(nametok.ident())
+            .expect("Name should exist"));
+
+        // scope should end
+        res.end_scope();
+        res.declare(&nametok);
+        res.define(&nametok);
+        assert!(res.scopes.is_empty());
     }
 }
