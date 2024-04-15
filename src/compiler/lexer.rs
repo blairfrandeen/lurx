@@ -110,13 +110,11 @@ pub struct Token {
     pub literal: Option<Literal>,
 }
 
-use std::hash::{Hash, Hasher};
 impl Hash for Token {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.loc.hash(state);
     }
 }
-
 
 /// Convenience / helper functions for quickly creating tokens for use in testing
 impl Token {
