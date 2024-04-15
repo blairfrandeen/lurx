@@ -104,7 +104,7 @@ impl<'a> Resolver<'a> {
             Expr::Variable(var) => {
                 if self
                     .scopes
-                    .first()
+                    .last()
                     .is_some_and(|s| s.borrow().get(var.ident()).is_some_and(|t| !*t))
                 {
                     return Err(ResolverError::OwnInitializer(var.clone()));
@@ -162,7 +162,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn declare(&self, name: &Token) -> Result<(), ResolverError> {
-        match self.scopes.first() {
+        match self.scopes.last() {
             Some(scope) => {
                 if scope.borrow().get(name.ident()).is_some() {
                     return Err(ResolverError::Redefinition(name.clone()));
@@ -175,7 +175,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn define(&self, name: &Token) {
-        match self.scopes.first() {
+        match self.scopes.last() {
             Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), true),
             None => return,
         };
