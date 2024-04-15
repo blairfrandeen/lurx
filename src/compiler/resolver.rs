@@ -9,6 +9,7 @@ use crate::compiler::{
 #[derive(Debug, PartialEq)]
 pub enum ResolverError {
     OwnInitializer(Token),
+    Redefinition(Token),
 }
 
 pub struct Resolver<'a> {
@@ -45,7 +46,7 @@ impl<'a> Resolver<'a> {
                 self.end_scope();
             }
             Stmt::VarDecl { name, initializer } => {
-                self.declare(name);
+                self.declare(name)?;
                 match initializer {
                     Some(expr) => self.resolve_expr(expr)?,
                     None => {}
@@ -60,12 +61,12 @@ impl<'a> Resolver<'a> {
                 parameters,
                 statements,
             } => {
-                self.declare(name);
+                self.declare(name)?;
                 self.define(name);
                 // TODO: Separate function form here to next comment when we do classes
                 self.begin_scope();
                 for param in parameters.iter() {
-                    self.declare(param);
+                    self.declare(param)?;
                     self.define(param);
                 }
                 self.resolve_stmt(statements)?;
@@ -147,11 +148,17 @@ impl<'a> Resolver<'a> {
         let _ = &self.scopes.pop();
     }
 
-    fn declare(&self, name: &Token) {
+    fn declare(&self, name: &Token) -> Result<(), ResolverError> {
         match self.scopes.first() {
-            Some(scope) => scope.borrow_mut().insert(name.ident().to_string(), false),
-            None => return,
-        };
+            Some(scope) => {
+                if scope.borrow().get(name.ident()).is_some() {
+                    return Err(ResolverError::Redefinition(name.clone()));
+                }
+                scope.borrow_mut().insert(name.ident().to_string(), false);
+                Ok(())
+            }
+            None => Ok(()),
+        }
     }
 
     fn define(&self, name: &Token) {
@@ -167,11 +174,15 @@ mod tests {
     use super::*;
     use crate::compiler::{interpreter, lexer, parser};
 
-    #[test]
-    fn own_decl_error() {
-        let source = "var a = \"init\"; {var a = a;}";
+    fn prgm_fixt(source: &str) -> parser::Program {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
+        program
+    }
+
+    #[test]
+    fn own_decl_error() {
+        let program = prgm_fixt("var a = \"init\"; {var a = a;}");
         let mut interp = interpreter::Interpreter::new();
         let mut res = Resolver::new(&mut interp);
         res.resolve(&program.statements);
@@ -182,19 +193,28 @@ mod tests {
     }
 
     #[test]
+    fn redefinition_error() {
+        let program = prgm_fixt("fun bad() { var a = \"first\"; var a = \"second\"; }");
+        let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        assert!(!res.errors.is_empty());
+    }
+
+    #[test]
     fn declare_define() {
         let mut interp = Interpreter::new();
         let mut res = Resolver::new(&mut interp);
         let nametok = Token::identifier("a".to_string());
 
         // with no scope, declare & define should do nothing
-        res.declare(&nametok);
+        let _ = res.declare(&nametok);
         res.define(&nametok);
         assert!(res.scopes.is_empty());
 
         res.begin_scope();
         assert_eq!(res.scopes.len(), 1);
-        res.declare(&nametok);
+        let _ = res.declare(&nametok);
         assert!(!res
             .scopes
             .first()
@@ -213,7 +233,7 @@ mod tests {
 
         // scope should end
         res.end_scope();
-        res.declare(&nametok);
+        let _ = res.declare(&nametok);
         res.define(&nametok);
         assert!(res.scopes.is_empty());
     }
