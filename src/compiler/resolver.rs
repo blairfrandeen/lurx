@@ -10,11 +10,21 @@ use crate::compiler::{
 pub enum ResolverError {
     OwnInitializer(Token),
     Redefinition(Token),
+    ReturnOutsideFunction(Stmt),
+    BreakOutsideLoop(Token),
+}
+
+#[derive(Clone, Debug)]
+enum FunctionType {
+    None,
+    Function,
+    // Loop,
 }
 
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
     pub errors: Vec<ResolverError>,
+    current_function: FunctionType,
     scopes: Vec<RefCell<HashMap<String, bool>>>,
 }
 
@@ -23,6 +33,7 @@ impl<'a> Resolver<'a> {
         Resolver {
             interpreter,
             scopes: vec![],
+            current_function: FunctionType::None,
             errors: vec![],
         }
     }
@@ -63,6 +74,8 @@ impl<'a> Resolver<'a> {
             } => {
                 self.declare(name)?;
                 self.define(name);
+                let enclosing_function = self.current_function.clone();
+                self.current_function = FunctionType::Function;
                 // TODO: Separate function form here to next comment when we do classes
                 self.begin_scope();
                 for param in parameters.iter() {
@@ -72,6 +85,7 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(statements)?;
                 self.end_scope();
                 // kend private function
+                self.current_function = enclosing_function;
             }
             Stmt::Conditional {
                 condition,
@@ -86,13 +100,20 @@ impl<'a> Resolver<'a> {
                 }
             }
             Stmt::Print(expr) => self.resolve_expr(expr)?,
-            Stmt::Return(expr) => self.resolve_expr(expr)?,
+            Stmt::Return(expr) => match self.current_function {
+                FunctionType::None => {
+                    return Err(ResolverError::ReturnOutsideFunction(statement.clone()))
+                }
+                FunctionType::Function => self.resolve_expr(expr)?,
+            },
             Stmt::WhileLoop {
                 condition,
                 statements,
             } => {
                 self.resolve_expr(condition)?;
+                // self.current_function = FunctionType::Loop;
                 self.resolve_stmt(statements)?;
+                // self.current_function = FunctionType::None;
             }
             Stmt::Break => {}
         };
@@ -192,6 +213,20 @@ mod tests {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
         program
+    }
+
+    #[test]
+    fn return_outside_fn_error() {
+        let program = prgm_fixt("var a = \"init\"; return a;");
+        let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        assert_eq!(
+            res.errors.first().expect("one error"),
+            &ResolverError::ReturnOutsideFunction(Stmt::Return(Expr::Variable(Token::identifier(
+                "a".to_string()
+            ))))
+        )
     }
 
     #[test]
