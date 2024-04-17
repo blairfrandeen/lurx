@@ -11,20 +11,19 @@ pub enum ResolverError {
     OwnInitializer(Token),
     Redefinition(Token),
     ReturnOutsideFunction(Stmt),
-    BreakOutsideLoop(Token),
+    BreakOutsideLoop(Stmt),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum FunctionType {
-    None,
     Function,
-    // Loop,
+    Loop,
 }
 
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
     pub errors: Vec<ResolverError>,
-    current_function: FunctionType,
+    function_stack: Vec<FunctionType>,
     scopes: Vec<RefCell<HashMap<String, bool>>>,
 }
 
@@ -33,7 +32,7 @@ impl<'a> Resolver<'a> {
         Resolver {
             interpreter,
             scopes: vec![],
-            current_function: FunctionType::None,
+            function_stack: vec![],
             errors: vec![],
         }
     }
@@ -74,8 +73,7 @@ impl<'a> Resolver<'a> {
             } => {
                 self.declare(name)?;
                 self.define(name);
-                let enclosing_function = self.current_function.clone();
-                self.current_function = FunctionType::Function;
+                self.function_stack.push(FunctionType::Function);
                 // TODO: Separate function form here to next comment when we do classes
                 self.begin_scope();
                 for param in parameters.iter() {
@@ -85,7 +83,7 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(statements)?;
                 self.end_scope();
                 // kend private function
-                self.current_function = enclosing_function;
+                self.function_stack.pop();
             }
             Stmt::Conditional {
                 condition,
@@ -100,24 +98,41 @@ impl<'a> Resolver<'a> {
                 }
             }
             Stmt::Print(expr) => self.resolve_expr(expr)?,
-            Stmt::Return(expr) => match self.current_function {
-                FunctionType::None => {
-                    return Err(ResolverError::ReturnOutsideFunction(statement.clone()))
-                }
-                FunctionType::Function => self.resolve_expr(expr)?,
+            Stmt::Return(expr) => match self.check_enc_func_type(FunctionType::Function) {
+                false => return Err(ResolverError::ReturnOutsideFunction(statement.clone())),
+                true => self.resolve_expr(expr)?,
             },
             Stmt::WhileLoop {
                 condition,
                 statements,
             } => {
                 self.resolve_expr(condition)?;
-                // self.current_function = FunctionType::Loop;
+                self.function_stack.push(FunctionType::Loop);
                 self.resolve_stmt(statements)?;
-                // self.current_function = FunctionType::None;
+                self.function_stack.pop();
             }
-            Stmt::Break => {}
+            Stmt::Break => {
+                if self
+                    .function_stack
+                    .last()
+                    .is_some_and(|ft| *ft == FunctionType::Loop)
+                {
+                    return Ok(());
+                } else {
+                    return Err(ResolverError::BreakOutsideLoop(statement.clone()));
+                }
+            }
         };
         Ok(())
+    }
+
+    fn check_enc_func_type(&self, expected: FunctionType) -> bool {
+        for func_type in self.function_stack.iter().rev() {
+            if *func_type == expected {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn resolve_expr(&mut self, expression: &Expr) -> Result<(), ResolverError> {
@@ -213,6 +228,30 @@ mod tests {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
         program
+    }
+
+    #[test]
+    fn break_outside_loop() {
+        let program = prgm_fixt("var a = \"init\"; break;");
+        let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        assert_eq!(
+            res.errors.first().expect("one error"),
+            &ResolverError::BreakOutsideLoop(Stmt::Break)
+        )
+    }
+
+    #[test]
+    fn break_in_fn_outside_loop() {
+        let program = prgm_fixt("fun a() { var b = \"init\"; break; }");
+        let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        assert_eq!(
+            res.errors.first().expect("one error"),
+            &ResolverError::BreakOutsideLoop(Stmt::Break)
+        )
     }
 
     #[test]
