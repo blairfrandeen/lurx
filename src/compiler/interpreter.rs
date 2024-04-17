@@ -8,9 +8,7 @@ use crate::compiler::{
     parser::{Expr, Program, Stmt},
 };
 
-use std::cell::RefCell;
-use std::io::Write;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeError {
@@ -36,6 +34,7 @@ pub enum RuntimeError {
 
 pub struct Interpreter {
     pub globals: Rc<RefCell<Environment>>,
+    locals: HashMap<Expr, usize>,
     out: Vec<u8>,
     flush: bool,
     print_expr: bool,
@@ -68,10 +67,15 @@ impl Interpreter {
         }
         Interpreter {
             globals,
+            locals: HashMap::new(),
             out: vec![],
             flush: false,
             print_expr: false,
         }
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.clone(), depth);
     }
 
     pub fn flush(&mut self) {
@@ -141,7 +145,12 @@ impl Interpreter {
             Stmt::Expression(expr) => match expr {
                 Expr::Assign { name, value } => {
                     let assignment = self.evaluate(value, environment.clone())?;
-                    environment.borrow_mut().update(name, assignment)?;
+                    match self.locals.get(expr) {
+                        Some(distance) => {
+                            environment.borrow_mut().set_at(*distance, name, assignment)
+                        }
+                        None => environment.borrow_mut().update(name, assignment)?,
+                    }
                     Ok(())
                 }
                 _ => {
@@ -206,8 +215,8 @@ impl Interpreter {
                 right,
             } => self.eval_binary(left, operator, right, environment),
             Expr::Grouping(expr) => self.eval_grouping(expr, environment),
-            Expr::Literal(token) => self.eval_literal(token, environment),
-            Expr::Variable(token) => self.eval_literal(token, environment),
+            Expr::Literal(token) => self.eval_literal(token, expr, environment),
+            Expr::Variable(token) => self.eval_literal(token, expr, environment),
             Expr::Assign { name: _, value: _ } => todo!(),
             Expr::Logical {
                 left,
@@ -391,10 +400,14 @@ impl Interpreter {
     fn eval_literal(
         &mut self,
         token: &Token,
+        expr: &Expr,
         environment: Rc<RefCell<Environment>>,
     ) -> Result<LoxValue, RuntimeError> {
         match &token.type_ {
-            TokenType::IDENTIFIER => environment.borrow().get(&token),
+            TokenType::IDENTIFIER => match self.locals.get(expr) {
+                Some(distance) => Ok(environment.borrow().get_at(*distance, token)),
+                None => self.globals.borrow().get(&token),
+            },
             _ => Ok(token.value()),
         }
     }
@@ -477,6 +490,8 @@ mod tests {
     use crate::interpreter;
     use crate::lexer::{self, token_iter};
     use crate::parser;
+    use crate::resolver::Resolver;
+    use std::fmt::Debug;
 
     #[test]
     fn test_logical_or() {
@@ -853,6 +868,14 @@ mod tests {
     }
 
     #[test]
+    fn resolver_scopes() {
+        test_output(
+"var a = 1; print a; { var a = 2; print a; {var a = 3; print a; {var a = 4; print a; } print a; } print a; } print a;",
+            "1\n2\n3\n4\n3\n2\n1\n",
+        );
+    }
+
+    #[test]
     fn test_ch8_scopes() {
         let scopes = std::fs::read_to_string("tests/scopes.lox").expect("file should exist");
         test_output(
@@ -897,6 +920,13 @@ mod tests {
     fn thrice_anonymous_func() {
         let thrice = std::fs::read_to_string("tests/thrice.lox").expect("file should exist");
         test_output(thrice.as_str(), "1\n2\n3\n")
+    }
+
+    #[test]
+    fn static_scope() {
+        let static_scope =
+            std::fs::read_to_string("tests/static_scope.lox").expect("file should exist");
+        test_output(static_scope.as_str(), "global\nglobal\n")
     }
 
     #[test]
@@ -999,11 +1029,30 @@ mod tests {
     fn test_output(source: &str, expected: &str) {
         let tokens = lexer::scan_source(&source.to_string()).unwrap();
         let program = parser::program(tokens, source.to_string());
-        assert!(&program.errors.is_empty());
+        check_errors(&program.errors);
         let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        check_errors(&res.errors);
         interp.set_flush(false);
         interp.run(&program);
         assert_eq!(interp.out, expected.as_bytes());
+    }
+
+    /// Check for errors in the completed resolver or parser
+    /// Raises a false assertion if errors are found; prints the debug for
+    /// the errors prior to failing the assertion.
+    fn check_errors<T>(err_vec: &Vec<T>)
+    where
+        T: Debug,
+    {
+        if !err_vec.is_empty() {
+            println!("Found {} Error(s)!", err_vec.len());
+        }
+        for error in err_vec.iter() {
+            println!("\t{:?}", error);
+        }
+        assert!(err_vec.is_empty());
     }
 
     #[test]
@@ -1052,7 +1101,11 @@ mod tests {
         // scan, parse, and run the interpreter so that a function call is defined.
         let tokens = lexer::scan_source(&fn_decl.to_string()).unwrap();
         let program = parser::program(tokens, fn_decl.to_string());
+        check_errors(&program.errors);
         let mut interp = interpreter::Interpreter::new();
+        let mut res = Resolver::new(&mut interp);
+        res.resolve(&program.statements);
+        check_errors(&res.errors);
         interp.set_flush(false);
         interp.run(&program);
 

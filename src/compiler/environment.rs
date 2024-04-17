@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 use crate::compiler::interpreter::RuntimeError;
-use crate::compiler::lexer::{Literal, Token};
+use crate::compiler::lexer::Token;
 use crate::compiler::object::LoxValue;
 
 #[derive(PartialEq, Clone)]
@@ -15,7 +15,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        match self.data.get(&Self::get_ident(&name)) {
+        match self.data.get(name.ident()) {
             Some(obj) => Ok(obj.clone()),
             None => match &self.enclosing {
                 Some(enc) => enc.borrow().get(&name),
@@ -24,15 +24,43 @@ impl Environment {
         }
     }
 
+    pub fn get_at(&self, distance: usize, name: &Token) -> LoxValue {
+        if distance > 0 {
+            return self
+                .enclosing
+                .clone()
+                .expect("Enclosing environment should exist per resolver")
+                .borrow()
+                .get_at(distance - 1, name);
+        }
+        self.data
+            .get(name.ident())
+            .expect("Name should exist per resolver")
+            .clone()
+    }
+
+    pub fn set_at(&mut self, distance: usize, name: &Token, value: LoxValue) {
+        if distance > 0 {
+            return self
+                .enclosing
+                .clone()
+                .expect("Enclosing environment should exist per resolver")
+                .borrow_mut()
+                .set_at(distance - 1, name, value);
+        }
+        self.update(name, value)
+            .expect("Name should exist per resolver");
+    }
+
     pub fn set(&mut self, name: &Token, value: LoxValue) {
-        let _ = &self.data.insert(Self::get_ident(&name), value);
+        let _ = &self.data.insert(name.ident().to_string(), value);
     }
 
     pub fn update(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
-        let has_key = &self.data.contains_key(&Self::get_ident(&name));
+        let has_key = &self.data.contains_key(name.ident());
         match has_key {
             true => {
-                let _ = &self.data.insert(Self::get_ident(&name), value);
+                let _ = &self.data.insert(name.ident().to_string(), value);
                 Ok(())
             }
             false => match &mut self.enclosing {
@@ -53,17 +81,6 @@ impl Environment {
         Environment {
             data: HashMap::new(),
             enclosing: Some(enclosing),
-        }
-    }
-
-    fn get_ident(name: &Token) -> String {
-        match name
-            .literal
-            .as_ref()
-            .expect("Attempt to get name from invalid token type!")
-        {
-            Literal::Ident(id) => id.to_string(),
-            _ => panic!("Attempt to get name from invalid token type!"),
         }
     }
 }
@@ -119,6 +136,73 @@ mod tests {
         };
 
         local
+    }
+
+    #[should_panic]
+    #[test]
+    fn get_at_panic() {
+        let local = env_fixture();
+        let _ = local.get_at(2, &Token::identifier("b".to_string()));
+    }
+
+    #[test]
+    fn get_at() {
+        let local = env_fixture();
+        let mut inner_data = HashMap::new();
+        let var_c = LoxValue::False;
+        inner_data.insert("c".to_string(), var_c);
+        let inner = Environment {
+            data: inner_data,
+            enclosing: Some(Rc::new(RefCell::new(local))),
+        };
+
+        assert_eq!(
+            inner.get_at(0, &Token::identifier("c".to_string())),
+            LoxValue::False
+        );
+        assert_eq!(
+            inner.get_at(1, &Token::identifier("b".to_string())),
+            LoxValue::True
+        );
+        assert_eq!(
+            inner.get_at(2, &Token::identifier("a".to_string())),
+            LoxValue::Number(7.0)
+        );
+    }
+
+    #[should_panic]
+    #[test]
+    fn set_at_panic() {
+        let mut local = env_fixture();
+        local.set_at(5, &Token::identifier("q".to_string()), LoxValue::Nil);
+    }
+
+    #[test]
+    fn set_at() {
+        let local = env_fixture();
+        let mut inner_data = HashMap::new();
+        let var_c = LoxValue::False;
+        inner_data.insert("c".to_string(), var_c);
+        let mut inner = Environment {
+            data: inner_data,
+            enclosing: Some(Rc::new(RefCell::new(local))),
+        };
+
+        inner.set_at(0, &Token::identifier("c".to_string()), LoxValue::Nil);
+        inner.set_at(1, &Token::identifier("b".to_string()), LoxValue::Nil);
+        inner.set_at(2, &Token::identifier("a".to_string()), LoxValue::Nil);
+        assert_eq!(
+            inner.get_at(0, &Token::identifier("c".to_string())),
+            LoxValue::Nil
+        );
+        assert_eq!(
+            inner.get_at(1, &Token::identifier("b".to_string())),
+            LoxValue::Nil
+        );
+        assert_eq!(
+            inner.get_at(2, &Token::identifier("a".to_string())),
+            LoxValue::Nil
+        );
     }
 
     #[test]

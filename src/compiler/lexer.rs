@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types, unused)]
-use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+};
 
 use thiserror::Error;
 
@@ -107,6 +110,12 @@ pub struct Token {
     pub literal: Option<Literal>,
 }
 
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.loc.hash(state);
+    }
+}
+
 /// Convenience / helper functions for quickly creating tokens for use in testing
 impl Token {
     pub fn from_type(type_: TokenType) -> Self {
@@ -143,6 +152,19 @@ impl Token {
     pub fn from(source: &str) -> Self {
         let results = scan_source(&source.to_string()).expect("Invalid Token!");
         results.get(0).expect("No tokens found!").to_owned()
+    }
+
+    /// For an IDENTIFIER token, get the name of the identifier.
+    /// Panic if called on a non-identifier token.
+    pub fn ident(&self) -> &String {
+        match &self
+            .literal
+            .as_ref()
+            .expect("Attempt to get name from invalid token type!")
+        {
+            Literal::Ident(id) => id,
+            _ => panic!("Attempt to get name from invalid token type!"),
+        }
     }
 }
 
@@ -377,6 +399,8 @@ impl PartialEq for Token {
         (self.type_ == other.type_) & (self.literal == other.literal)
     }
 }
+
+impl Eq for Token {}
 
 /// for testing purposes
 pub fn token_iter(source: &str) -> std::iter::Peekable<std::vec::IntoIter<Token>> {
