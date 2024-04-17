@@ -213,6 +213,10 @@ mod tests {
         let mut res = Resolver::new(&mut interp);
         res.resolve(&program.statements);
         assert!(!res.errors.is_empty());
+        assert_eq!(
+            res.errors.first().expect("one error"),
+            &ResolverError::Redefinition(Token::identifier("a".to_string()))
+        )
     }
 
     #[test]
