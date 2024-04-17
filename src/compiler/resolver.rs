@@ -139,7 +139,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_local(&mut self, expression: &Expr, name: &String) {
-        let mut i = self.scopes.len() as i32 - 1;
+        let mut i = self.scopes.len() as i32;
         while i >= 0 {
             if self
                 .scopes
@@ -147,7 +147,8 @@ impl<'a> Resolver<'a> {
                 .is_some_and(|s| s.borrow().get(name).is_some())
             {
                 self.interpreter
-                    .resolve(expression, self.scopes.len() - 1 - i as usize)
+                    .resolve(expression, self.scopes.len() - 1 - i as usize);
+                return;
             }
             i = i - 1;
         }

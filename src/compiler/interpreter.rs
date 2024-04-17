@@ -6,7 +6,6 @@ use crate::compiler::{
     lexer::{Literal, Token, TokenType},
     object::LoxValue,
     parser::{Expr, Program, Stmt},
-    resolver::Resolver,
 };
 
 use std::{cell::RefCell, collections::HashMap, io::Write, rc::Rc};
@@ -491,6 +490,7 @@ mod tests {
     use crate::interpreter;
     use crate::lexer::{self, token_iter};
     use crate::parser;
+    use crate::resolver::Resolver;
     use std::fmt::Debug;
 
     #[test]
@@ -864,6 +864,14 @@ mod tests {
         test_output(
             "var a = 7; var b = 5; { var a = 1; print a; {var a = 2; print a; print b;}} print a;",
             "1\n2\n5\n7\n",
+        );
+    }
+
+    #[test]
+    fn resolver_scopes() {
+        test_output(
+"var a = 1; print a; { var a = 2; print a; {var a = 3; print a; {var a = 4; print a; } print a; } print a; } print a;",
+            "1\n2\n3\n4\n3\n2\n1\n",
         );
     }
 
