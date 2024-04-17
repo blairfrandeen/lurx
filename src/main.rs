@@ -60,6 +60,13 @@ fn execute(source: &String, interp: &mut interpreter::Interpreter, show_ast: boo
     }
     let mut res = resolver::Resolver::new(interp);
     res.resolve(&program.statements);
+    if !res.errors.is_empty() {
+        for error in res.errors.iter() {
+            // TODO: implement report for resolver errors
+            dbg!(&error);
+        }
+        return;
+    }
 
     interp.run(&program);
     interp.flush();
