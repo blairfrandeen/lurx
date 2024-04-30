@@ -1,3 +1,4 @@
+[![Rust](https://github.com/blairfrandeen/lurx/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/blairfrandeen/lurx/actions/workflows/rust.yml)
 # Lurx - A Lox Interpreter in Rust
 
 This is an implementation of Lox from the book [Crafting
